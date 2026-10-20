@@ -1,3 +1,27 @@
+/**
+ * @openapi
+ * /users:
+ *   get:
+ *     tags: [Users]
+ *     summary: List admin users (SUPER_ADMIN only)
+ *     security: [{ cookieAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
+ *         name: role
+ *         schema: { type: string, enum: [SUPER_ADMIN, ADMIN, EDITOR] }
+ *     responses:
+ *       200: { description: Paginated list of users }
+ *       403: { description: Insufficient permissions }
+ */
 import { Router } from "express";
 import { body } from "express-validator";
 import path from "node:path";
@@ -32,6 +56,9 @@ const importMulter = multer({
 });
 
 router.get("/", requireAuth, requireRole("SUPER_ADMIN", "ADMIN"), listUsers);
+router.get("/export", requireAuth, requireRole("SUPER_ADMIN"), exportUsers);
+router.get("/template", requireAuth, requireRole("SUPER_ADMIN"), exportUsersTemplate);
+router.post("/import", requireAuth, requireRole("SUPER_ADMIN"), importMulter.single("file"), importUsers);
 router.get("/:id", requireAuth, requireRole("SUPER_ADMIN", "ADMIN"), getUser);
 router.post(
   "/",
@@ -58,7 +85,3 @@ router.post(
 );
 
 export default router;
-
-router.get("/export", requireAuth, requireRole("SUPER_ADMIN"), exportUsers);
-router.get("/template", requireAuth, requireRole("SUPER_ADMIN"), exportUsersTemplate);
-router.post("/import", requireAuth, requireRole("SUPER_ADMIN"), importMulter.single("file"), importUsers);

@@ -33,29 +33,33 @@ export async function findEntity(model, id, options = {}) {
   return record;
 }
 
+export const MATCH_STATUSES = ["SCHEDULED", "LIVE", "FINISHED", "POSTPONED", "CANCELLED"];
+
+const STATUS_ALIASES = { FT: "FINISHED", UPCOMING: "SCHEDULED" };
+
+export function normalizeMatchStatus(status) {
+  const aliased = STATUS_ALIASES[status] || status;
+  return MATCH_STATUSES.includes(aliased) ? aliased : "SCHEDULED";
+}
+
+export function matchStatusFlags(status) {
+  const normalized = normalizeMatchStatus(status);
+  return {
+    status: normalized,
+    isLive: normalized === "LIVE",
+    isFinished: normalized === "FINISHED",
+  };
+}
+
 export function toMatchStatus({ status, homeScore, awayScore, minute }) {
-  if (status === "FT" || status === "POSTPONED" || status === "CANCELLED") {
-    return { status, isLive: false, isFinished: status === "FT" };
+  const flags = matchStatusFlags(status);
+  if (flags.status === "LIVE") {
+    return { ...flags, minute: minute ?? 0 };
   }
-  if (status === "LIVE") {
-    return {
-      status,
-      isLive: true,
-      isFinished: false,
-      minute: minute ?? 0,
-    };
+  if (flags.status === "SCHEDULED") {
+    return { ...flags, homeScore: homeScore ?? null, awayScore: awayScore ?? null, minute: null };
   }
-  if (status === "UPCOMING") {
-    return {
-      status,
-      isLive: false,
-      isFinished: false,
-      homeScore: homeScore ?? null,
-      awayScore: awayScore ?? null,
-      minute: null,
-    };
-  }
-  return { status, isLive: false, isFinished: false, homeScore, awayScore, minute };
+  return { ...flags };
 }
 
 export function slugify(str) {

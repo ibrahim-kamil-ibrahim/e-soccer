@@ -4,7 +4,7 @@ import { Plus, Pencil, Trash2, Eye, CheckSquare } from "lucide-react";
 import { playerService } from "../../services/playerService.js";
 import { teamService } from "../../services/teamService.js";
 import DataTable, { SearchInput, FilterSelect, FilterBar } from "../components/DataTable.jsx";
-import { Badge, PageHeader } from "../components/ui.jsx";
+import { Badge, Button, PageHeader } from "../components/ui.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import { useToast } from "../components/Toast.jsx";
 import ExcelActions from "../components/ExcelActions.jsx";
@@ -183,7 +183,13 @@ export default function Players() {
             header: "Player",
             render: (r) => (
               <div className="flex items-center gap-3">
-                <span className="text-lg">{r.photo || "👤"}</span>
+                {r.photo ? (
+                  <img src={r.photo} alt={r.name} className="w-9 h-9 rounded-lg object-cover border border-[var(--color-border)] shrink-0" />
+                ) : (
+                  <div className="w-9 h-9 rounded-lg bg-[var(--color-green-dim)] border border-[var(--color-green)]/10 flex items-center justify-center text-sm font-bold text-[var(--color-green)] shrink-0">
+                    {r.name?.charAt(0)?.toUpperCase() || "?"}
+                  </div>
+                )}
                 <div>
                   <div className="text-[var(--color-text)] font-medium">{r.name}</div>
                   <div className="text-xs text-[#64748B]">{r.position || "—"}</div>

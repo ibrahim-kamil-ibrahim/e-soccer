@@ -8,6 +8,7 @@ import { env } from "../config/env.js";
 import { exportToExcel, generateTemplate } from "../services/excel/excelExport.js";
 import { validateAndImport, parseExcel } from "../services/excel/excelImport.js";
 import { getTemplate } from "../services/excel/excelTemplates.js";
+import { importMulter } from "../services/excel/importMulter.js";
 import os from "node:os";
 import crypto from "node:crypto";
 
@@ -23,25 +24,18 @@ const storage = multer.diskStorage({
   },
 });
 
-const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"]);
+const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"]);
+const ALLOWED_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"]);
 
 export const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!ALLOWED.has(file.mimetype)) return cb(new AppError(400, "Only JPEG, PNG, WebP, GIF and SVG images are allowed"));
-    cb(null, true);
-  },
-});
-
-export const importMulter = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(file.mimetype) || ext === ".xlsx" || ext === ".xls") cb(null, true);
-    else cb(new AppError(400, "Only .xlsx and .xls files are allowed"));
+    if (!ALLOWED_MIME.has(file.mimetype) || !ALLOWED_EXT.has(ext)) {
+      return cb(new AppError(400, "Only JPEG, PNG, WebP, GIF and SVG images are allowed"));
+    }
+    cb(null, true);
   },
 });
 

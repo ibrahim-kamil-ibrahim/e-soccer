@@ -69,6 +69,7 @@ export default function CompetitionDetails({ setSearchOpen, favorites, setFavori
   const [competition, setCompetition] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("Overview");
+  const [bracket, setBracket] = useState(null);
 
   useEffect(() => {
     competitionService.get(id).then((res) => {
@@ -77,7 +78,14 @@ export default function CompetitionDetails({ setSearchOpen, favorites, setFavori
       }
       setLoading(false);
     });
+    competitionService.bracket(id).then((res) => {
+      if (res.success && res.bracket) setBracket(res.bracket);
+    }).catch(() => {});
   }, [id]);
+
+  const tabs = bracket?.rounds?.length
+    ? ["Overview", "Matches", "Bracket", ...TABS.filter((t) => t !== "Matches" && t !== "Overview")]
+    : TABS;
 
   const allTeams = competition?.teams || [];
   const allMatches = competition?.matches || [];
@@ -147,7 +155,7 @@ export default function CompetitionDetails({ setSearchOpen, favorites, setFavori
       </div>
 
       <div className="flex gap-1 bg-black/[0.03] rounded-xl p-1 overflow-x-auto">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -187,6 +195,52 @@ export default function CompetitionDetails({ setSearchOpen, favorites, setFavori
           ) : (
             <div className="es-card p-12 text-center">
               <p className="text-[var(--color-text-muted)] text-sm">No matches scheduled</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "Bracket" && bracket?.rounds?.length > 0 && (
+        <div className="space-y-6">
+          {bracket.rounds.map((round) => (
+            <div key={round.roundNumber} className="es-card-static p-4">
+              <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">{round.name}</h3>
+              <div className="space-y-2">
+                {round.matches.map((m, mi) => (
+                  <div key={m.id || `b${round.roundNumber}-${mi}`} className="flex items-center gap-2 p-2 rounded-lg bg-black/[0.02] border border-[var(--color-border)]">
+                    <div className={`flex-1 flex items-center gap-2 justify-end text-right ${m.winnerTeamId && m.winnerTeamId === m.home?.id ? "text-[var(--color-green)] font-semibold" : "text-[var(--color-text)]"}`}>
+                      <span className="text-sm truncate">{m.home?.name || "TBD"}</span>
+                      {m.home?.logo && <span className="shrink-0">{m.home.logo}</span>}
+                    </div>
+                    <div className="px-3 text-center shrink-0">
+                      {m.id ? (
+                        <span className="text-sm font-bold text-[var(--color-text)]">
+                          {m.homeScore != null && m.awayScore != null ? `${m.homeScore}–${m.awayScore}` : "vs"}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] uppercase text-[var(--color-text-muted)] font-medium">
+                          {m.away?.name === "Bye" ? "Bye" : "TBD"}
+                        </span>
+                      )}
+                      {m.homePenalties != null && m.awayPenalties != null && (
+                        <span className="block text-[10px] text-[var(--color-text-muted)]">pens {m.homePenalties}–{m.awayPenalties}</span>
+                      )}
+                    </div>
+                    <div className={`flex-1 flex items-center gap-2 ${m.winnerTeamId && m.winnerTeamId === m.away?.id ? "text-[var(--color-green)] font-semibold" : "text-[var(--color-text)]"}`}>
+                      {m.away?.logo && <span className="shrink-0">{m.away.logo}</span>}
+                      <span className="text-sm truncate">{m.away?.name || "TBD"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          {bracket.champion && (
+            <div className="es-card p-5 text-center space-y-1">
+              <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Champion</p>
+              <p className="text-2xl font-display font-bold text-[var(--color-green)]">
+                {bracket.champion.logo ? `${bracket.champion.logo} ` : ""}{bracket.champion.name}
+              </p>
             </div>
           )}
         </div>

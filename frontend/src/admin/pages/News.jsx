@@ -173,7 +173,7 @@ export default function News() {
         onPageChange={(p) => setPagination((prev) => ({ ...prev, page: p }))}
         emptyText="No articles found"
         selectable
-        selectIds={selected}
+        selectedIds={selected}
         onToggle={toggle}
         onSelectAll={selectAll}
         columns={[

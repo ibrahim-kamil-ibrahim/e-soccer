@@ -25,7 +25,7 @@ const NAV_ITEMS = [
 
 const ICON_SIZE = 20;
 
-export default function Header({ onSearchOpen }) {
+export default function Header({ onSearchOpen, favoritesCount = 0 }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -74,12 +74,6 @@ export default function Header({ onSearchOpen }) {
             <Bell size={ICON_SIZE} />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
           </button>
-          <Link
-            to="/profile"
-            className="hidden md:flex w-9 h-9 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-black/[0.03] transition-colors"
-          >
-            <User size={ICON_SIZE} />
-          </Link>
           <button
             onClick={() => setMobileOpen(true)}
             className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-black/[0.03] transition-colors"
@@ -145,12 +139,12 @@ export default function Header({ onSearchOpen }) {
                   <span className="text-sm font-medium">Favorites</span>
                 </div>
                 <span className="text-xs bg-black/[0.04] text-[var(--color-text-muted)] px-2 py-0.5 rounded-full">
-                  0
+                  {favoritesCount}
                 </span>
               </Link>
 
               <Link
-                to="/profile"
+                to="/admin/profile"
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center justify-between px-3 py-3 rounded-lg mb-1 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-black/[0.03] transition-colors"
               >
@@ -168,7 +162,7 @@ export default function Header({ onSearchOpen }) {
   );
 }
 
-export function MobileBottomNav() {
+export function MobileBottomNav({ favoritesCount = 0 }) {
   const location = useLocation();
 
   const bottomItems = [
@@ -176,7 +170,7 @@ export function MobileBottomNav() {
     { label: "Matches", path: "/matches", icon: Trophy },
     { label: "Competitions", path: "/competitions", icon: Trophy },
     { label: "Teams", path: "/teams", icon: Users },
-    { label: "Saved", path: "/favorites", icon: Heart },
+    { label: "Saved", path: "/favorites", icon: Heart, badge: favoritesCount },
   ];
 
   return (
@@ -194,7 +188,14 @@ export function MobileBottomNav() {
                   : "text-[var(--color-text-muted)]"
               }`}
             >
-              <item.icon size={18} />
+              <span className="relative">
+                <item.icon size={18} />
+                {item.badge > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[var(--color-green)] text-white text-[9px] leading-[14px] text-center font-semibold">
+                    {item.badge}
+                  </span>
+                )}
+              </span>
               <span className="text-[10px] font-medium">{item.label}</span>
             </Link>
           );
@@ -251,7 +252,7 @@ export function Footer() {
             <ul className="space-y-2.5">
               {[
                 { label: "Favorites", path: "/favorites" },
-                { label: "Profile", path: "/profile" },
+                { label: "Profile", path: "/admin/profile" },
                 { label: "Search", path: "/search" },
               ].map((item) => (
                 <li key={item.path}>

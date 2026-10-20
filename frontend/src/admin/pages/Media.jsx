@@ -292,6 +292,14 @@ export default function Media() {
         title="Delete Media?"
         message={deleteTarget ? `This will permanently delete "${deleteTarget.filename}" and its file.` : ""}
       />
+
+      <ExcelImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        entity="Media"
+        plural="media"
+        onDownloadTemplate={handleDownloadTemplate}
+      />
     </div>
   );
 }

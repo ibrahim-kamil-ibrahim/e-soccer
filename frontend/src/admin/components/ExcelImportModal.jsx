@@ -8,7 +8,8 @@ export default function ExcelImportModal({ open, onClose, entity, plural, onDown
   const [fileName, setFileName] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [result, setResult] = useState(null);
-  const fileInputRef = useRef(null);
+  const inputElRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const handleFile = useCallback((file) => {
     if (!file) return;
@@ -18,8 +19,7 @@ export default function ExcelImportModal({ open, onClose, entity, plural, onDown
       return;
     }
     setFileName(file.name);
-    // Store file reference — we'll read it on import
-    fileInputRef.current = file;
+    setSelectedFile(file);
   }, []);
 
   const handleDrop = useCallback((e) => {
@@ -30,16 +30,15 @@ export default function ExcelImportModal({ open, onClose, entity, plural, onDown
   }, [handleFile]);
 
   const handleValidate = async () => {
-    if (!fileInputRef.current) return;
+    if (!selectedFile) return;
     setPhase("loading");
     try {
       const formData = new FormData();
-      formData.append("file", fileInputRef.current);
-      const res = await api.upload(`/api/${plural}/import`, formData);
+      formData.append("file", selectedFile);
+      const res = await api.upload(`/${plural}/import`, formData);
       setResult(res);
       setPhase("result");
     } catch (err) {
-      // If the error response has a message, show it
       alert(err.message || `Import failed: ${err.message}`);
       setPhase("select");
     }
@@ -67,7 +66,7 @@ export default function ExcelImportModal({ open, onClose, entity, plural, onDown
     setPhase("select");
     setFileName("");
     setResult(null);
-    fileInputRef.current = null;
+    setSelectedFile(null);
     onClose();
   };
 
@@ -108,13 +107,13 @@ export default function ExcelImportModal({ open, onClose, entity, plural, onDown
                 <p className="text-sm text-[var(--color-text)] font-medium mb-1">Drag & drop your Excel file here</p>
                 <p className="text-xs text-[#94A3B8] mb-3">or</p>
                 <button
-                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                  onClick={() => inputElRef.current && inputElRef.current.click()}
                   className="text-sm text-[#16A34A] hover:text-[#22C55E] font-medium transition-colors"
                 >
                   Choose Excel File
                 </button>
                 <input
-                  ref={(el) => { fileInputRef.current = el; }}
+                  ref={inputElRef}
                   type="file"
                   accept=".xlsx,.xls"
                   className="hidden"
@@ -132,7 +131,7 @@ export default function ExcelImportModal({ open, onClose, entity, plural, onDown
                     <File className="w-4 h-4 text-[#94A3B8]" />
                     {fileName}
                   </span>
-                  <button onClick={() => { setFileName(""); fileInputRef.current = null; }} className="p-1 rounded hover:bg-black/[0.04] text-[#94A3B8] hover:text-red-500 transition-colors">
+                  <button onClick={() => { setFileName(""); setSelectedFile(null); }} className="p-1 rounded hover:bg-black/[0.04] text-[#94A3B8] hover:text-red-500 transition-colors">
                     <X className="w-4 h-4" />
                   </button>
                 </div>

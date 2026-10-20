@@ -1,6 +1,9 @@
 import ExcelJS from "exceljs";
+import path from "node:path";
+import bcrypt from "bcryptjs";
 import { getTemplate } from "./excelTemplates.js";
 import { validateLookup } from "./validators.js";
+import { matchStatusFlags, slugify } from "../helpers.js";
 
 export async function parseExcel(filePath) {
   const workbook = new ExcelJS.Workbook();
@@ -29,9 +32,73 @@ export async function parseExcel(filePath) {
   return { headers, rows };
 }
 
+const ENTITY_MODELS = {
+  teams: "team",
+  players: "player",
+  matches: "match",
+  competitions: "competition",
+  cities: "city",
+  news: "newsArticle",
+  users: "adminUser",
+  media: "media",
+};
+
 function resolveModelName(entity) {
-  if (entity === "news") return "newsArticle";
-  return entity.charAt(0).toUpperCase() + entity.slice(1);
+  if (ENTITY_MODELS[entity]) return ENTITY_MODELS[entity];
+  return entity.charAt(0).toLowerCase() + entity.slice(1);
+}
+
+function toModelRecord(entity, record) {
+  const data = { ...record };
+  if (entity === "teams") {
+    data.competitionId = data.competitionName ?? undefined;
+    delete data.competitionName;
+    if (!data.slug && data.name) data.slug = slugify(data.name);
+  }
+  if (entity === "players") {
+    data.teamId = data.teamName ?? undefined;
+    delete data.teamName;
+    if (!data.age && data.dateOfBirth) {
+      data.age = Math.floor((Date.now() - new Date(data.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    }
+  }
+  if (entity === "matches") {
+    data.competitionId = data.competitionName ?? undefined;
+    data.homeTeamId = data.homeTeamName ?? undefined;
+    data.awayTeamId = data.awayTeamName ?? undefined;
+    delete data.competitionName;
+    delete data.homeTeamName;
+    delete data.awayTeamName;
+    if (data.status) {
+      const flags = matchStatusFlags(data.status);
+      data.status = flags.status;
+      data.isLive = flags.isLive;
+      data.isFinished = flags.isFinished;
+    }
+    if (data.timeField === null || data.timeField === undefined) delete data.timeField;
+  }
+  if (entity === "users") {
+    if (data.email) data.email = String(data.email).toLowerCase().trim();
+    if (data.username === "") delete data.username;
+    if (data.password) data.passwordHash = bcrypt.hashSync(String(data.password), 12);
+    delete data.password;
+    if (!data.role) data.role = "EDITOR";
+    if (!data.status) data.status = "ACTIVE";
+  }
+  if (entity === "media") {
+    if (!data.filename && data.url) data.filename = path.basename(String(data.url));
+    if (data.size === undefined || data.size === null || Number.isNaN(data.size)) data.size = 0;
+    if (!data.mimeType && data.url) {
+      const ext = path.extname(String(data.url)).toLowerCase();
+      const types = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml" };
+      data.mimeType = types[ext] || "application/octet-stream";
+    }
+  }
+  // Drop nulls so Prisma applies column defaults instead of rejecting explicit nulls
+  for (const key of Object.keys(data)) {
+    if (data[key] === null) delete data[key];
+  }
+  return data;
 }
 
 export async function validateAndImport(entity, rows, headers, userId, prisma, logActivity) {
@@ -190,9 +257,6 @@ export async function validateAndImport(entity, rows, headers, userId, prisma, l
   if (entity === "news") {
     for (const row of mappedRows) {
       if (!row.record.slug || row.record.slug === null || row.record.slug === "") {
-        row.record.slug = getTemplate("news").slug ? "" : "";
-        // Use slugify from templates
-        const { slugify } = await import("./excelTemplates.js");
         row.record.slug = slugify(row.record.title || `article-${row.idx + 1}`);
       }
     }
@@ -206,7 +270,7 @@ export async function validateAndImport(entity, rows, headers, userId, prisma, l
         let pw = "";
         for (let i = 0; i < 12; i++) pw += chars[Math.floor(Math.random() * chars.length)];
         row.record.password = pw;
-        row.warnings.push(`Password not provided — generated placeholder: ${pw}`);
+        row.warnings.push("Password not provided — a placeholder password was generated");
       }
     }
   }
@@ -231,7 +295,7 @@ export async function validateAndImport(entity, rows, headers, userId, prisma, l
     try {
       await prisma.$transaction(async (tx) => {
         for (const record of validRecords) {
-          await tx[modelName].create({ data: record });
+          await tx[modelName].create({ data: toModelRecord(entity, record) });
           imported++;
         }
       });
@@ -261,6 +325,9 @@ export async function validateAndImport(entity, rows, headers, userId, prisma, l
     imported,
     errors,
     warningRecords: warningRecords.map((w) => ({ row: w._row, warnings: w._warnings })),
-    importedRecords: validRecords,
+    importedRecords:
+      entity === "users"
+        ? validRecords.map(({ password, ...rest }) => rest)
+        : validRecords,
   };
 }

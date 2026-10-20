@@ -60,14 +60,33 @@ export function formatTime(timeStr) {
   return `${hour12}:${minutes} ${ampm}`
 }
 
+export const MATCH_STATUSES = ["SCHEDULED", "LIVE", "FINISHED", "POSTPONED", "CANCELLED"];
+
+export function getStatusLabel(status) {
+  switch (status) {
+    case "SCHEDULED":
+      return "UPCOMING"
+    case "FINISHED":
+      return "FT"
+    case "LIVE":
+      return "LIVE"
+    default:
+      return status || ""
+  }
+}
+
 export function getStatusColor(status) {
   switch (status) {
     case "LIVE":
       return "text-green-600 bg-green-50"
-    case "FT":
+    case "FINISHED":
       return "text-slate-600 bg-slate-100"
-    case "UPCOMING":
+    case "SCHEDULED":
       return "text-blue-600 bg-blue-50"
+    case "POSTPONED":
+      return "text-yellow-600 bg-yellow-50"
+    case "CANCELLED":
+      return "text-red-600 bg-red-50"
     default:
       return "text-slate-600 bg-slate-100"
   }

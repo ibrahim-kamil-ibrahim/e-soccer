@@ -3,7 +3,7 @@ import { matchService } from "../services/matchService.js"
 import { MatchCard, LiveMatchCard } from "../components/common/Cards.jsx"
 import { MatchSkeleton, EmptyState } from "../components/common/LoadingSkeletons.jsx"
 import { FilterBar } from "../components/common/SearchOverlay.jsx"
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react"
+import { Calendar, ChevronLeft, ChevronRight, X } from "lucide-react"
 
 function mapMatch(m) {
   const d = m.date ? new Date(m.date) : null;
@@ -23,7 +23,7 @@ export default function Matches({ setSearchOpen, favorites, setFavorites }) {
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState("all")
-  const [dateNav, setDateNav] = useState(new Date().toISOString().split("T")[0])
+  const [dateNav, setDateNav] = useState("")
   const [filters, setFilters] = useState({ competition: "", team: "" })
 
   useEffect(() => {
@@ -55,8 +55,10 @@ export default function Matches({ setSearchOpen, favorites, setFavorites }) {
     { key: "team", label: "Team", values: teamNames },
   ]
 
+  const today = () => new Date().toISOString().split("T")[0]
+
   const navigateDate = (offset) => {
-    const d = new Date(dateNav + "T00:00:00")
+    const d = new Date((dateNav || today()) + "T00:00:00")
     d.setDate(d.getDate() + offset)
     setDateNav(d.toISOString().split("T")[0])
   }
@@ -65,7 +67,7 @@ export default function Matches({ setSearchOpen, favorites, setFavorites }) {
     let result = matches
 
     if (tab === "live") result = result.filter((m) => m.isLive)
-    if (tab === "upcoming") result = result.filter((m) => m.status === "UPCOMING")
+    if (tab === "upcoming") result = result.filter((m) => m.status === "SCHEDULED")
     if (tab === "finished") result = result.filter((m) => m.isFinished)
 
     if (filters.competition) result = result.filter((m) => m.competition === filters.competition)
@@ -108,12 +110,23 @@ export default function Matches({ setSearchOpen, favorites, setFavorites }) {
           <ChevronLeft size={16} />
         </button>
         <button
-          onClick={() => setDateNav(new Date().toISOString().split("T")[0])}
+          onClick={() => setDateNav(today())}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-black/[0.03] text-[var(--color-text-secondary)] hover:bg-black/[0.05] transition-colors text-sm font-medium"
         >
           <Calendar size={14} />
-          {new Date(dateNav + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+          {dateNav
+            ? new Date(dateNav + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+            : "All dates"}
         </button>
+        {dateNav && (
+          <button
+            onClick={() => setDateNav("")}
+            className="p-2 rounded-lg bg-black/[0.03] text-[var(--color-text-secondary)] hover:bg-black/[0.05] transition-colors"
+            title="Clear date filter"
+          >
+            <X size={16} />
+          </button>
+        )}
         <button
           onClick={() => navigateDate(1)}
           className="p-2 rounded-lg bg-black/[0.03] text-[var(--color-text-secondary)] hover:bg-black/[0.05] transition-colors"

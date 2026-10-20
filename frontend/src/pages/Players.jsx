@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { playerService } from "../services/playerService.js"
 import { PlayerCard } from "../components/common/Cards.jsx"
-import { PlayerSkeleton, EmptyState } from "../components/common/LoadingSkeletons.jsx"
+import { PlayerSkeleton, EmptyState, ErrorState } from "../components/common/LoadingSkeletons.jsx"
 import { Search } from "lucide-react"
 
 export default function Players({ setSearchOpen, favorites, setFavorites }) {
@@ -10,14 +10,33 @@ export default function Players({ setSearchOpen, favorites, setFavorites }) {
   const [filterPosition, setFilterPosition] = useState("")
   const [filterTeam, setFilterTeam] = useState("")
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
-    playerService.list().then((res) => {
-      if (res.success) {
-        setPlayers(res.items.map((p) => ({ ...p, team: p.team?.name || "" })));
+    let cancelled = false
+    async function loadAll() {
+      try {
+        const all = []
+        let page = 1
+        let pages = 1
+        do {
+          const res = await playerService.list({ page, limit: 100 })
+          if (!res.success) break
+          all.push(...res.items)
+          pages = res.pagination?.pages || 1
+          page += 1
+        } while (page <= pages && !cancelled)
+        if (!cancelled) setPlayers(all.map((p) => ({ ...p, team: p.team?.name || "" })))
+      } catch {
+        if (!cancelled) setError(true)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      setLoading(false);
-    });
+    }
+    loadAll()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const positions = useMemo(() => [...new Set(players.map((p) => p.position))], [players])
@@ -91,6 +110,12 @@ export default function Players({ setSearchOpen, favorites, setFavorites }) {
             <PlayerSkeleton key={i} />
           ))}
         </div>
+      ) : error ? (
+        <ErrorState
+          title="Failed to load players"
+          message="Something went wrong while fetching the player list. Please try again."
+          onRetry={() => window.location.reload()}
+        />
       ) : filtered.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {filtered.map((p) => (

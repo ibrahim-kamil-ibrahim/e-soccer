@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { getStatusLabel, formatDate } from "../../utils/helpers.js";
 
 export function TeamCard({ team }) {
   return (
@@ -40,9 +41,13 @@ export function PlayerCard({ player }) {
   return (
     <Link to={`/players/${player.id}`}>
       <div className="es-card p-4 flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-[var(--color-green-dim)] border border-[var(--color-green)]/10 flex items-center justify-center text-sm font-bold text-[var(--color-green)]">
-          {player.name.charAt(0)}
-        </div>
+        {player.photo ? (
+          <img src={player.photo} alt={player.name} className="w-11 h-11 rounded-xl object-cover border border-[var(--color-green)]/10" />
+        ) : (
+          <div className="w-11 h-11 rounded-xl bg-[var(--color-green-dim)] border border-[var(--color-green)]/10 flex items-center justify-center text-sm font-bold text-[var(--color-green)]">
+            {player.name.charAt(0)}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-sm text-[var(--color-text)] truncate">{player.name}</div>
           <div className="text-xs text-[var(--color-text-muted)]">
@@ -118,12 +123,12 @@ export function MatchCard({ match }) {
           {match.status === "LIVE" ? (
             <span className="tag-live inline-flex items-center gap-1.5">
               <span className="live-dot" />
-              LIVE {match.minute}
+              LIVE{match.minute != null ? ` ${match.minute}` : ""}
             </span>
-          ) : match.status === "FT" ? (
+          ) : match.status === "FINISHED" ? (
             <span className="tag-ft">FT</span>
           ) : (
-            <span className="tag-upcoming">UPCOMING</span>
+            <span className={`tag-upcoming ${match.status === "CANCELLED" ? "tag-ft" : ""}`}>{getStatusLabel(match.status)}</span>
           )}
           <span className="text-xs text-[var(--color-text-secondary)]">
             {match.competition?.name || match.competition}
@@ -137,7 +142,7 @@ export function MatchCard({ match }) {
             </div>
           </div>
           <div className="font-display font-extrabold text-lg text-[var(--color-text)] mx-3">
-            {match.status === "UPCOMING" ? (
+            {match.homeScore == null || match.awayScore == null ? (
               <span className="text-xs text-[var(--color-text-muted)] font-normal">VS</span>
             ) : (
               <>
@@ -155,7 +160,7 @@ export function MatchCard({ match }) {
           </div>
         </div>
         <div className="text-[10px] text-[var(--color-text-muted)] text-center mt-3">
-          {match.date} · {match.time}
+          {match.date ? formatDate(match.date) : ""} · {match.timeField || match.time || ""}
         </div>
       </div>
     </Link>

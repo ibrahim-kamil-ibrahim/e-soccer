@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Eye, Edit, Trash2, MapPin, Hash, Award, Calendar, AtSign, MessageCircle, Send, Globe, MoreHorizontal, AlertTriangle } from "lucide-react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { ArrowLeft, Eye, Edit, Trash2, MapPin, Hash, Award, Calendar, Globe, MessageCircle } from "lucide-react";
 import { playerService } from "../../services/playerService.js";
 import { teamService } from "../../services/teamService.js";
-import { cityService } from "../../services/cityService.js";
-import { api } from "../../services/api.js";
 import { Badge, Button } from "../components/ui.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import { useToast } from "../components/Toast.jsx";
@@ -13,6 +11,7 @@ const STATUS_COLORS = { PUBLISHED: "green", DRAFT: "yellow", ARCHIVED: "slate" }
 
 export default function PlayerDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [player, setPlayer] = useState(null);
   const [team, setTeam] = useState(null);
@@ -34,7 +33,7 @@ export default function PlayerDetail() {
       await playerService.remove(deleteTarget.id);
       toast("Player deleted");
       setDeleteTarget(null);
-      window.location.href = "/admin/players";
+      navigate("/admin/players");
     } catch (err) { toast(err.message, "error"); }
     finally { setDeleting(false); }
   };
@@ -63,10 +62,10 @@ export default function PlayerDetail() {
           <ArrowLeft size={18} />
         </Link>
         <div className="flex-1" />
-        <Button type="button" variant="ghost" onClick={() => window.location.href = `/admin/players/${id}/edit`} className="gap-2">
+        <Button type="button" variant="ghost" onClick={() => navigate(`/admin/players/${id}/edit`)} className="gap-2">
           <Eye size={16} /> View
         </Button>
-        <Button type="button" variant="ghost" onClick={() => window.location.href = `/admin/players/${id}/edit`} className="gap-2 text-[#22C55E] hover:bg-black/[0.04]">
+        <Button type="button" variant="ghost" onClick={() => navigate(`/admin/players/${id}/edit`)} className="gap-2 text-[#22C55E] hover:bg-black/[0.04]">
           <Edit size={16} /> Edit
         </Button>
         <Button type="button" variant="ghost" onClick={() => setDeleteTarget(player)} className="gap-2 text-[#EF4444] hover:bg-black/[0.04]">
@@ -218,7 +217,7 @@ export default function PlayerDetail() {
           <div className="bg-white border border-[var(--color-border)] rounded-xl p-5">
             <h3 className="text-sm font-semibold text-[#64748B] uppercase tracking-wide mb-3">Actions</h3>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="ghost" onClick={() => window.location.href = `/admin/players/${id}/edit`} className="gap-2">
+              <Button type="button" variant="ghost" onClick={() => navigate(`/admin/players/${id}/edit`)} className="gap-2">
                 <Edit size={14} /> Edit Player
               </Button>
               <Button type="button" variant="ghost" onClick={() => setDeleteTarget(player)} className="gap-2 text-[#EF4444]">

@@ -38,8 +38,8 @@ function StatCard({ icon: Icon, label, value, color }) {
 function matchStatusColor(status) {
   const map = {
     LIVE: "green",
-    UPCOMING: "blue",
-    FT: "slate",
+    SCHEDULED: "blue",
+    FINISHED: "slate",
     POSTPONED: "yellow",
     CANCELLED: "red",
   };

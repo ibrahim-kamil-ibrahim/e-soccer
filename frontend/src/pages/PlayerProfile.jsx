@@ -81,9 +81,13 @@ export default function PlayerProfile({ setSearchOpen, favorites, setFavorites }
 
       {/* Header */}
       <div className="es-card-static p-6 flex flex-col sm:flex-row items-center sm:items-start gap-5">
-        <div className="w-20 h-20 rounded-2xl bg-[var(--color-green-dim)] border border-[var(--color-border)] flex items-center justify-center text-3xl font-bold text-[var(--color-green)] shrink-0">
-          {player.name.charAt(0)}
-        </div>
+        {player.photo ? (
+          <img src={player.photo} alt={player.name} className="w-20 h-20 rounded-2xl object-cover border-2 border-[var(--color-border)] shrink-0" />
+        ) : (
+          <div className="w-20 h-20 rounded-2xl bg-[var(--color-green-dim)] border border-[var(--color-border)] flex items-center justify-center text-3xl font-bold text-[var(--color-green)] shrink-0">
+            {player.name.charAt(0)}
+          </div>
+        )}
         <div className="flex-1 text-center sm:text-left">
           <h1 className="text-2xl font-display font-bold text-[var(--color-text)]">{player.name}</h1>
           <div className="flex items-center justify-center sm:justify-start gap-2 mt-2">
@@ -114,7 +118,7 @@ export default function PlayerProfile({ setSearchOpen, favorites, setFavorites }
       </div>
 
       {/* Tab Bar */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+      <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: "thin" }}>
         {tabs.map((tab) => (
           <button
             key={tab.key}

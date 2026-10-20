@@ -70,7 +70,7 @@ export function getTemplate(entity) {
         { header: "Away Team", field: "awayTeamName", required: true, example: "East Africa SC", type: "lookup", lookup: { model: "Team", displayField: "name" } },
         { header: "Home Score", field: "homeScore", required: false, example: 2, type: "number" },
         { header: "Away Score", field: "awayScore", required: false, example: 1, type: "number" },
-        { header: "Status", field: "status", required: false, example: "FT", type: "enum", enum: ["UPCOMING", "LIVE", "FT", "POSTPONED", "CANCELLED"] },
+        { header: "Status", field: "status", required: false, example: "FINISHED", type: "enum", enum: ["SCHEDULED", "LIVE", "FINISHED", "POSTPONED", "CANCELLED"] },
         { header: "Minute", field: "minute", required: false, example: 90, type: "number" },
         { header: "Date", field: "date", required: true, example: "2025-08-15", type: "date" },
         { header: "Time", field: "timeField", required: false, example: "15:00", type: "string" },

@@ -1,25 +1,14 @@
 import { prisma } from "../config/prisma.js";
 import { AppError, asyncHandler } from "../middleware/errorHandler.js";
-import { logActivity, buildSearchWhere, formatPagination } from "../services/helpers.js";
+import { logActivity, buildSearchWhere, formatPagination, slugify } from "../services/helpers.js";
 import { exportToExcel, generateTemplate } from "../services/excel/excelExport.js";
 import { validateAndImport, parseExcel } from "../services/excel/excelImport.js";
 import { getTemplate } from "../services/excel/excelTemplates.js";
+import { importMulter } from "../services/excel/importMulter.js";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
-import multer from "multer";
-
-const importMulter = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(file.mimetype) || ext === ".xlsx" || ext === ".xls") cb(null, true);
-    else cb(new AppError(400, "Only .xlsx and .xls files are allowed"));
-  },
-});
 
 export const listCities = asyncHandler(async (req, res) => {
   const { page, limit, skip } = formatPagination(req.query);
@@ -136,7 +125,7 @@ export const deleteCities = asyncHandler(async (req, res) => {
 
 function normalizeCity(d) {
   const name = d.name || "";
-  const slug = d.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const slug = d.slug || slugify(name);
   return {
     name, slug, region: d.region || "", cityType: d.cityType || null, subcity: d.subcity || null,
     woreda: d.woreda || null, kebele: d.kebele || null, logo: d.logo || null, description: d.description || null,

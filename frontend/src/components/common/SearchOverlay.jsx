@@ -1,14 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Search, X, Users, User, Trophy, Newspaper } from "lucide-react";
-import { teams } from "../../data/teams.js";
-import { competitions } from "../../data/competitions.js";
-import { news } from "../../data/news.js";
-import { players } from "../../data/players.js";
+import { teamService } from "../../services/teamService.js";
+import { playerService } from "../../services/playerService.js";
+import { competitionService } from "../../services/competitionService.js";
+import { newsService } from "../../services/newsService.js";
 
 export function SearchOverlay({ isOpen, onClose }) {
   const [query, setQuery] = useState("");
+  const [teams, setTeams] = useState([]);
+  const [players, setPlayers] = useState([]);
+  const [competitions, setCompetitions] = useState([]);
+  const [news, setNews] = useState([]);
+  const [loading, setLoading] = useState(false);
   const inputRef = useRef(null);
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -26,29 +32,42 @@ export function SearchOverlay({ isOpen, onClose }) {
     }
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = query.trim();
+    if (!q) {
+      setTeams([]); setPlayers([]); setCompetitions([]); setNews([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const [teamsRes, playersRes, compsRes, newsRes] = await Promise.all([
+          teamService.list({ search: q, limit: 10 }),
+          playerService.list({ search: q, limit: 10 }),
+          competitionService.list({ search: q, limit: 10 }),
+          newsService.list({ search: q, limit: 10 }),
+        ]);
+        setTeams(teamsRes.items || []);
+        setPlayers(playersRes.items || []);
+        setCompetitions(compsRes.items || []);
+        setNews(newsRes.items || []);
+      } catch {
+        setTeams([]); setPlayers([]); setCompetitions([]); setNews([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [query, isOpen]);
+
   if (!isOpen) return null;
 
-  const q = query.toLowerCase().trim();
-
-  const matchedTeams = q
-    ? teams.filter(
-        (t) =>
-          t.name.toLowerCase().includes(q) ||
-          (t.city && t.city.toLowerCase().includes(q))
-      )
-    : [];
-
-  const matchedPlayers = q
-    ? players.filter((p) => p.name.toLowerCase().includes(q))
-    : [];
-
-  const matchedCompetitions = q
-    ? competitions.filter((c) => c.name.toLowerCase().includes(q))
-    : [];
-
-  const matchedNews = q
-    ? news.filter((n) => n.title.toLowerCase().includes(q))
-    : [];
+  const matchedTeams = teams;
+  const matchedPlayers = players;
+  const matchedCompetitions = competitions;
+  const matchedNews = news;
 
   const hasResults =
     matchedTeams.length ||
@@ -86,9 +105,14 @@ export function SearchOverlay({ isOpen, onClose }) {
             </button>
           </div>
 
-          {q && (
+          {query.trim() && (
             <div className="mt-4 max-h-[60vh] overflow-y-auto">
-              {!hasResults && (
+              {loading && (
+                <div className="text-center py-8 text-sm text-[var(--color-text-secondary)]">
+                  Searching...
+                </div>
+              )}
+              {!loading && !hasResults && (
                 <div className="text-center py-8 text-sm text-[var(--color-text-secondary)]">
                   No results found
                 </div>

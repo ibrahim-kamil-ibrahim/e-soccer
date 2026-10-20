@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { normalizeMatchStatus } from "./helpers.js";
 
 export async function computeStandings(competitionId) {
   const competition = await prisma.competition.findUnique({
@@ -16,7 +17,7 @@ export async function computeStandings(competitionId) {
     (m) =>
       m.homeScore !== null &&
       m.awayScore !== null &&
-      (m.status === "FT" || m.isFinished)
+      (normalizeMatchStatus(m.status) === "FINISHED" || m.isFinished)
   );
 
   const stats = new Map(

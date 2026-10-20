@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  LayoutTemplate,
   CalendarDays,
   Trophy,
   Shield,
@@ -21,7 +20,6 @@ import {
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { ToastProvider } from "../components/Toast.jsx";
 import { useTheme } from "../contexts/ThemeContext.jsx";
-import { ThemeProvider } from "../contexts/ThemeContext.jsx";
 import { Sun, Moon } from "lucide-react";
 
 const NAV = [
@@ -33,11 +31,14 @@ const NAV = [
   { to: "/admin/players", label: "Players", icon: Users },
   { to: "/admin/news", label: "News", icon: Newspaper },
   { to: "/admin/media", label: "Media", icon: ImageIcon },
-  { to: "/admin/activity", label: "Activity", icon: Clock },
-  { to: "/admin/homepage", label: "Homepage", icon: LayoutTemplate },
-  { to: "/admin/users", label: "Users", icon: UserCog },
-  { to: "/admin/settings", label: "Settings", icon: Settings },
+  { to: "/admin/activity", label: "Activity", icon: Clock, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { to: "/admin/users", label: "Users", icon: UserCog, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { to: "/admin/settings", label: "Settings", icon: Settings, roles: ["SUPER_ADMIN", "ADMIN"] },
 ];
+
+function visibleNav(userRole) {
+  return NAV.filter((item) => !item.roles || item.roles.includes(userRole));
+}
 
 const ROLE_LABELS = {
   SUPER_ADMIN: "Super Admin",
@@ -74,7 +75,7 @@ function Sidebar({ mobile, onClose }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-        {NAV.map((item) => (
+        {visibleNav(user?.role).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -167,15 +168,7 @@ function Topbar({ onMenu }) {
 }
 
 export default function AdminLayout() {
-  const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    document.body.style.backgroundImage = "none";
-    return () => {
-      document.body.style.backgroundImage = "";
-    };
-  }, []);
 
   useEffect(() => {
     document.body.style.backgroundImage = "none";

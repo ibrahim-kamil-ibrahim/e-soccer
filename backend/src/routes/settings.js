@@ -1,5 +1,29 @@
+/**
+ * @openapi
+ * /settings:
+ *   get:
+ *     tags: [Settings]
+ *     summary: Get website settings
+ *     responses:
+ *       200: { description: Website settings }
+ */
+
+/**
+ * @openapi
+ * /settings:
+ *   put:
+ *     tags: [Settings]
+ *     summary: Update website settings
+ *     security: [{ cookieAuth: [] }]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object }
+ *     responses:
+ *       200: { description: Settings updated }
+ */
 import { Router } from "express";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import {
   getSettings,
   updateSettings,
@@ -10,7 +34,7 @@ import {
 const router = Router();
 
 router.get("/", getSettings);
-router.put("/", requireAuth, updateSettings);
+router.put("/", requireAuth, requireRole("SUPER_ADMIN", "ADMIN"), updateSettings);
 router.get("/homepage", getHomepage);
 router.put("/homepage", requireAuth, updateHomepage);
 

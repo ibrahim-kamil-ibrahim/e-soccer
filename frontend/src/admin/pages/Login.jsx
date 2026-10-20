@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Navigate, Link } from "react-router-dom";
-import { ShieldCheck, Lock, User, Loader2, ArrowLeft, Sun, Moon } from "lucide-react";
+import { ShieldCheck, Lock, Mail, Loader2, ArrowLeft, Sun, Moon } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useTheme } from "../contexts/ThemeContext.jsx";
 
@@ -21,7 +21,7 @@ function InlineThemeToggle() {
 export default function AdminLogin() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,7 @@ export default function AdminLogin() {
     setError("");
     setLoading(true);
     try {
-      await login(username, password);
+      await login(email, password);
       navigate("/admin/dashboard");
     } catch (err) {
       setError(err.message || "Login failed");
@@ -83,18 +83,18 @@ export default function AdminLogin() {
 
           <div className="mb-4">
             <label className="block text-xs font-medium text-[#64748B] uppercase tracking-wide mb-1.5">
-              Username
+              Email
             </label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                autoComplete="username"
+                autoComplete="email"
                 className="w-full bg-white border border-[var(--color-border)] rounded-lg pl-9 pr-3 py-2.5 text-sm text-[var(--color-text)] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#16A34A]/60"
-                placeholder="ibro"
+                placeholder="your@email.com"
               />
             </div>
           </div>
@@ -126,15 +126,7 @@ export default function AdminLogin() {
             {loading ? "Signing in..." : "Sign In"}
           </button>
 
-          <div className="mt-4 px-4 py-3 rounded-lg bg-[var(--color-surface-dim)] border border-dashed border-[var(--color-border)] text-xs text-[#64748B] leading-relaxed">
-            <strong className="text-[#64748B]">Demo logins</strong>
-            <br />
-            ibro / 12341234 (Super Admin)
-            <br />
-            admin@esoccer.et / admin1234 (Super Admin)
-            <br />
-            editor@esoccer.et / editor1234 (Editor)
-          </div>
+
         </form>
 
         <div className="text-center mt-6">

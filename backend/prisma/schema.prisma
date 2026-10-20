@@ -25,9 +25,9 @@ enum PublicationStatus {
 }
 
 enum MatchStatus {
-  UPCOMING
+  SCHEDULED
   LIVE
-  FT
+  FINISHED
   POSTPONED
   CANCELLED
 }
@@ -56,15 +56,18 @@ enum MediaCategory {
 }
 
 model AdminUser {
-  id           Int        @id @default(autoincrement())
-  name         String
-  email        String     @unique
-  username     String?    @unique
-  passwordHash String
-  role         Role       @default(EDITOR)
-  status       UserStatus @default(ACTIVE)
-  createdAt    DateTime   @default(now())
-  lastLoginAt  DateTime?
+  id                  Int        @id @default(autoincrement())
+  name                String
+  email               String     @unique
+  username            String?    @unique
+  passwordHash        String
+  role                Role       @default(EDITOR)
+  status              UserStatus @default(ACTIVE)
+  preferences         Json?
+  createdAt           DateTime   @default(now())
+  lastLoginAt         DateTime?
+  failedLoginAttempts Int        @default(0)
+  lockedUntil         DateTime?
 
   logs ActivityLog[]
 
@@ -85,6 +88,7 @@ model Competition {
   color       String?
   status      PublicationStatus @default(PUBLISHED)
   sortOrder   Int        @default(0)
+  bracketSeeds Json?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -164,6 +168,7 @@ model Team {
   players      Player[]
   homeMatches  Match[] @relation("HomeTeamMatches")
   awayMatches  Match[] @relation("AwayTeamMatches")
+  bracketWins  Match[] @relation("MatchBracketWinners")
 
   @@index([competitionId])
 }
@@ -215,11 +220,22 @@ model Match {
   awayTeam      Team        @relation("AwayTeamMatches", fields: [awayTeamId], references: [id])
   homeScore     Int?
   awayScore     Int?
-  status        MatchStatus @default(UPCOMING)
+  status        MatchStatus @default(SCHEDULED)
   minute        Int?
   date          DateTime
   timeField     String?     @map("time")
   venue         String?
+  round         String?
+  roundNumber   Int?
+  bracketPosition Int?
+  winnerTeamId  Int?
+  winnerTeam    Team?      @relation("MatchBracketWinners", fields: [winnerTeamId], references: [id], onDelete: SetNull)
+  homePenalties Int?
+  awayPenalties Int?
+  addedTime     Int?
+  addedTimeSecond Int?
+  phase         String?
+  notes         String?
   referee       String?
   attendance    Int?
   isLive        Boolean     @default(false)
@@ -235,6 +251,7 @@ model Match {
   @@index([homeTeamId])
   @@index([awayTeamId])
   @@index([date])
+  @@index([roundNumber])
 }
 
 model MatchEvent {

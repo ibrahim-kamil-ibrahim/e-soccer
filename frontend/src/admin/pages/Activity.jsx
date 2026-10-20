@@ -50,12 +50,12 @@ export default function Activity() {
   }, [load]);
 
   const columns = [
-    { key: "action", label: "Action", render: (a) => <ActionBadge action={a.action} /> },
-    { key: "entity", label: "Entity" },
-    { key: "entityId", label: "ID" },
+    { key: "action", header: "Action", render: (a) => <ActionBadge action={a.action} /> },
+    { key: "entity", header: "Entity" },
+    { key: "entityId", header: "ID" },
     {
       key: "user",
-      label: "User",
+      header: "User",
       render: (a) => {
         const u = a.user;
         return u ? (
@@ -70,7 +70,7 @@ export default function Activity() {
         );
       },
     },
-    { key: "createdAt", label: "Time", render: (a) => (
+    { key: "createdAt", header: "Time", render: (a) => (
       <span className="flex items-center gap-1.5 text-xs text-[#64748B]">
         <Clock className="w-3 h-3" />
         {new Date(a.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
@@ -88,9 +88,12 @@ export default function Activity() {
         columns={columns}
         rows={items}
         loading={loading}
-        pagination={{ page, limit, total, onPage: setPage }}
-        empty="No activity recorded yet"
-        rowKey="id"
+        page={page}
+        pages={Math.ceil(total / limit)}
+        total={total}
+        onPageChange={setPage}
+        emptyText="No activity recorded yet"
+        rowKey={(r) => r.id}
       />
     </div>
   );

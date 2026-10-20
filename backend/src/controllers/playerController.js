@@ -1,25 +1,14 @@
 import { prisma } from "../config/prisma.js";
 import { AppError, asyncHandler } from "../middleware/errorHandler.js";
-import { logActivity, buildSearchWhere, formatPagination } from "../services/helpers.js";
+import { logActivity, buildSearchWhere, formatPagination, slugify } from "../services/helpers.js";
 import { exportToExcel, generateTemplate } from "../services/excel/excelExport.js";
 import { validateAndImport, parseExcel } from "../services/excel/excelImport.js";
 import { getTemplate } from "../services/excel/excelTemplates.js";
+import { importMulter } from "../services/excel/importMulter.js";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
-import multer from "multer";
-
-const importMulter = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(file.mimetype) || ext === ".xlsx" || ext === ".xls") cb(null, true);
-    else cb(new AppError(400, "Only .xlsx and .xls files are allowed"));
-  },
-});
 
 export const listPlayers = asyncHandler(async (req, res) => {
   const { page, limit, skip } = formatPagination(req.query);
@@ -84,7 +73,7 @@ export const deletePlayers = asyncHandler(async (req, res) => {
 
 function normalizePlayer(d) {
   const name = d.name || "";
-  const slug = d.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const slug = d.slug || slugify(name);
   const dateOfBirth = d.dateOfBirth ? new Date(d.dateOfBirth) : null;
   let age = d.age != null ? Number(d.age) : null;
   if (dateOfBirth && !age) { const diff = Date.now() - dateOfBirth.getTime(); age = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000)); }

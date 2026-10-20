@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { matchService } from '../services/matchService.js';
-import { PossessionBar, StatsRow } from '../components/common/Cards.jsx';
-import { MatchSkeleton, EmptyState } from '../components/common/LoadingSkeletons.jsx';
+import { PossessionBar } from '../components/common/Cards.jsx';
+import { MatchSkeleton } from '../components/common/LoadingSkeletons.jsx';
 import { ArrowLeft } from 'lucide-react';
 
 function mapMatch(m) {
@@ -31,27 +31,36 @@ export default function MatchCenter({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
-  useEffect(() => {
-    async function fetchMatch() {
-      try {
-        const res = await matchService.get(id);
-        const raw = res.match || res;
-        setMatch(mapMatch(raw));
-        setEvents((raw.events || []).map((e) => ({
-          ...e,
-          type: e.type === 'yellow_card' ? 'yellowCard' : e.type === 'red_card' ? 'redCard' : e.type,
-        })));
-        setStatistics(raw.statistics || null);
-        setLineups(raw.lineups || null);
-        setStandings(raw.standings || []);
-      } catch (err) {
-        console.error('Failed to load match:', err);
-      } finally {
-        setLoading(false);
+  const load = useCallback(async () => {
+    try {
+      const res = await matchService.get(id);
+      const raw = res.match || res;
+      setMatch(mapMatch(raw));
+      setEvents(raw.events || []);
+      setStatistics(raw.statistics || null);
+      setLineups(Array.isArray(raw.lineups) ? raw.lineups : raw.lineups ? [raw.lineups] : []);
+      if (raw.competitionId) {
+        try {
+          const standRes = await matchService.standings(id);
+          setStandings(standRes.standings || []);
+        } catch {
+          setStandings([]);
+        }
       }
+    } catch (err) {
+      console.error('Failed to load match:', err);
+    } finally {
+      setLoading(false);
     }
-    fetchMatch();
   }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (match?.status !== 'LIVE') return;
+    const iv = setInterval(load, 30000);
+    return () => clearInterval(iv);
+  }, [match?.status, load]);
 
   if (loading) {
     return (
@@ -90,7 +99,7 @@ export default function MatchCenter({
   }
 
   const isLive = match.status === 'LIVE';
-  const statusLabel = isLive ? 'LIVE' : match.status === 'FT' ? 'FT' : match.status;
+  const statusLabel = isLive ? 'LIVE' : match.status === 'FINISHED' ? 'FT' : match.status === 'SCHEDULED' ? 'UPCOMING' : match.status;
 
   const tabs = [
     { key: 'overview', label: 'Overview' },
@@ -103,9 +112,13 @@ export default function MatchCenter({
   const venue = match.venue || 'TBD';
   const referee = match.referee || 'TBD';
   const dateStr = match.date ? new Date(match.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'TBD';
-  const kickoff = match.timeField || match.time || 'TBD';
+  // `timeField` is authoritative, but a match saved without the time input has
+  // null there while `date` still holds the real kickoff instant.
+  const kickoff = match.timeField || (match.date ? new Date(match.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'TBD');
   const attendance = match.attendance || 'TBD';
   const competition = match.competition?.name || match.competition || 'TBD';
+  const round = match.round || (match.roundNumber ? `Round ${match.roundNumber}` : 'TBD');
+  const season = match.season || 'TBD';
 
   const formatMinute = (minute) => {
     if (!minute && minute !== 0) return '';
@@ -127,6 +140,8 @@ export default function MatchCenter({
         { label: 'Kickoff', value: kickoff },
         { label: 'Attendance', value: attendance },
         { label: 'Competition', value: competition },
+        { label: 'Season', value: season },
+        { label: 'Round', value: round },
       ].map((item) => (
         <div key={item.label} className="es-card p-4">
           <span className="block text-xs uppercase tracking-wider text-[var(--color-text-muted)] mb-1">
@@ -141,7 +156,11 @@ export default function MatchCenter({
   );
 
   const renderLineups = () => {
-    if (!lineups) {
+    const bySide = (side) => (lineups || []).find((l) => l.side === side);
+    const home = bySide("HOME");
+    const away = bySide("AWAY");
+
+    if (!home && !away) {
       return (
         <div className="es-card p-8 text-center text-[var(--color-text-muted)]">
           Lineups not available.
@@ -149,41 +168,54 @@ export default function MatchCenter({
       );
     }
 
-    const renderTeam = (teamData, side) => (
+    const nameOf = (p) => (typeof p === "object" && p !== null ? p.name || "" : String(p || ""));
+    const positionOf = (p) => (typeof p === "object" && p !== null ? p.position || "" : "");
+
+    const renderTeam = (lineup, teamName) => (
       <div className="space-y-4">
-        <h3 className="font-display text-lg font-bold text-[var(--color-text)]">
-          {side} XI
-        </h3>
-        <div className="es-card p-4 space-y-3">
-          {(teamData.starting || []).map((player, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between text-sm"
-            >
-              <span className="text-[var(--color-text)]">{player.name}</span>
-              <span className="text-[var(--color-text-muted)] text-xs">
-                {player.position}
-              </span>
-            </div>
-          ))}
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-lg font-bold text-[var(--color-text)]">
+            {teamName} XI
+          </h3>
+          {lineup?.formation && (
+            <span className="badge-muted text-xs px-2 py-0.5">{lineup.formation}</span>
+          )}
         </div>
-        {teamData.substitutes && teamData.substitutes.length > 0 && (
+        <div className="es-card p-4 space-y-2">
+          {(lineup?.startingXI || []).length > 0 ? (
+            lineup.startingXI.map((player, i) => (
+              <div key={i} className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-3">
+                  <span className="w-5 h-5 rounded-full bg-[var(--color-green-dim)] text-[10px] flex items-center justify-center font-semibold text-[var(--color-green)]">
+                    {i + 1}
+                  </span>
+                  <span className="text-[var(--color-text)]">{nameOf(player)}</span>
+                </span>
+                {positionOf(player) && (
+                  <span className="text-[var(--color-text-muted)] text-xs">
+                    {positionOf(player)}
+                  </span>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="text-sm text-[var(--color-text-muted)]">Not available</div>
+          )}
+        </div>
+        {(lineup?.substitutes || []).length > 0 && (
           <>
             <h3 className="font-display text-base font-semibold text-[var(--color-text-secondary)]">
               Substitutes
             </h3>
-            <div className="es-card p-4 space-y-3">
-              {teamData.substitutes.map((player, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span className="text-[var(--color-text-secondary)]">
-                    {player.name}
-                  </span>
-                  <span className="text-[var(--color-text-muted)] text-xs">
-                    {player.position}
-                  </span>
+            <div className="es-card p-4 space-y-2">
+              {lineup.substitutes.map((player, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--color-text-secondary)]">{nameOf(player)}</span>
+                  {positionOf(player) && (
+                    <span className="text-[var(--color-text-muted)] text-xs">
+                      {positionOf(player)}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -194,8 +226,8 @@ export default function MatchCenter({
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {renderTeam(lineups.home || {}, match.homeTeam)}
-        {renderTeam(lineups.away || {}, match.awayTeam)}
+        {renderTeam(home, match.homeTeam)}
+        {renderTeam(away, match.awayTeam)}
       </div>
     );
   };
@@ -209,45 +241,54 @@ export default function MatchCenter({
       );
     }
 
-    const getEventIcon = (type) => {
-      switch (type) {
-        case 'goal':
-          return <span className="text-[var(--color-green)] font-bold">⚽</span>;
-        case 'yellowCard':
-          return <span className="text-yellow-400">🟨</span>;
-        case 'redCard':
-          return <span className="text-[var(--color-red)]">🟥</span>;
-        case 'substitution':
-          return <span className="text-blue-400">🔄</span>;
-        default:
-          return <span className="text-[var(--color-text-muted)]">•</span>;
-      }
+    const EVENT_META = {
+      GOAL: { icon: "⚽", label: "Goal" },
+      OWN_GOAL: { icon: "⚽", label: "Own Goal" },
+      PENALTY: { icon: "⚽", label: "Penalty" },
+      YELLOW_CARD: { icon: "🟨", label: "Yellow Card" },
+      RED_CARD: { icon: "🟥", label: "Red Card" },
+      SUBSTITUTION: { icon: "🔄", label: "Substitution" },
     };
+
+    const sorted = [...events].sort(
+      (a, b) => (a.minute ?? 0) - (b.minute ?? 0)
+    );
 
     return (
       <div className="es-card p-4 space-y-3 max-h-[500px] overflow-y-auto">
-        {events.map((event, i) => (
-          <div
-            key={i}
-            className="flex items-start gap-3 p-3 rounded-lg hover:bg-black/[0.03] transition-colors"
-          >
-            <span className="w-12 text-right font-mono text-sm font-bold text-[var(--color-green)] shrink-0">
-              {formatMinute(event.minute)}
-            </span>
-            <span className="shrink-0">{getEventIcon(event.type)}</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-[var(--color-text)]">{event.description}</p>
-              {event.player && (
+        {sorted.map((event, i) => {
+          const meta = EVENT_META[event.type] || { icon: "•", label: event.type };
+          const playerLine =
+            event.playerName ||
+            (event.type === "SUBSTITUTION" ? event.playerIn || "—" : meta.label);
+          const detailParts = [];
+          if (event.assist) detailParts.push(`Assist: ${event.assist}`);
+          if (event.type === "SUBSTITUTION") {
+            if (event.playerIn) detailParts.push(`IN: ${event.playerIn}`);
+            if (event.playerOut) detailParts.push(`OUT: ${event.playerOut}`);
+          }
+          detailParts.push(meta.label);
+          return (
+            <div
+              key={event.id ?? i}
+              className="flex items-start gap-3 p-3 rounded-lg hover:bg-black/[0.03] transition-colors"
+            >
+              <span className="w-12 text-right font-mono text-sm font-bold text-[var(--color-green)] shrink-0">
+                {formatMinute(event.minute)}
+              </span>
+              <span className="shrink-0">{meta.icon}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-[var(--color-text)]">{playerLine}</p>
                 <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                  {event.player}
+                  {detailParts.join(" · ")}
                 </p>
-              )}
+              </div>
+              <span className="text-[10px] font-semibold text-[var(--color-text-muted)] shrink-0 uppercase tracking-wide">
+                {event.side === "AWAY" ? match.awayTeam : match.homeTeam}
+              </span>
             </div>
-            <span className="text-xs text-[var(--color-text-muted)] shrink-0">
-              {event.team}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -261,38 +302,50 @@ export default function MatchCenter({
       );
     }
 
-    const possession = statistics.possession || 50;
-    const stats = [
-      { label: 'Shots on Target', home: statistics.shotsOnTarget?.home || 0, away: statistics.shotsOnTarget?.away || 0 },
-      { label: 'Shots off Target', home: statistics.shotsOffTarget?.home || 0, away: statistics.shotsOffTarget?.away || 0 },
-      { label: 'Fouls', home: statistics.fouls?.home || 0, away: statistics.fouls?.away || 0 },
-      { label: 'Corners', home: statistics.corners?.home || 0, away: statistics.corners?.away || 0 },
-      { label: 'Offsides', home: statistics.offsides?.home || 0, away: statistics.offsides?.away || 0 },
-      { label: 'Saves', home: statistics.saves?.home || 0, away: statistics.saves?.away || 0 },
-      { label: 'Pass Accuracy', home: statistics.passAccuracy?.home || 0, away: statistics.passAccuracy?.away || 0 },
-      { label: 'Tackles', home: statistics.tackles?.home || 0, away: statistics.tackles?.away || 0 },
-    ];
+    const hasPossession =
+      statistics.possession !== null &&
+      statistics.possession !== undefined &&
+      !Number.isNaN(Number(statistics.possession));
+    const possession = hasPossession ? Number(statistics.possession) : 0;
+
+    const tiles = [
+      ["Shots", statistics.shots],
+      ["Shots on Target", statistics.shotsOnTarget],
+      ["Corners", statistics.corners],
+      ["Fouls", statistics.fouls],
+      ["Offsides", statistics.offside],
+      ["Saves", statistics.saves],
+      ["Passes", statistics.passes],
+      ["Yellow Cards", statistics.yellowCards],
+      ["Red Cards", statistics.redCards],
+    ].filter(([, value]) => value !== null && value !== undefined);
 
     return (
       <div className="space-y-6">
-        <div className="es-card p-6">
-          <PossessionBar
-            home={typeof possession === 'object' ? possession.home : possession}
-            away={typeof possession === 'object' ? possession.away : 100 - possession}
-            homeLabel={match.homeTeam}
-            awayLabel={match.awayTeam}
-          />
-        </div>
-        <div className="space-y-3">
-          {stats.map((stat) => (
-            <StatsRow
-              key={stat.label}
-              label={stat.label}
-              home={stat.home}
-              away={stat.away}
-            />
-          ))}
-        </div>
+        {hasPossession && (
+          <div className="es-card p-6">
+            <div className="text-xs uppercase tracking-wider text-[var(--color-text-muted)] mb-3 text-center">
+              Possession
+            </div>
+            <PossessionBar home={possession} away={Math.max(0, 100 - possession)} />
+          </div>
+        )}
+        {tiles.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {tiles.map(([label, value]) => (
+              <div key={label} className="es-card p-4 text-center">
+                <div className="text-xl font-display font-bold text-[var(--color-text)]">
+                  {value}
+                </div>
+                <div className="text-xs text-[var(--color-text-muted)] mt-1">{label}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="es-card p-8 text-center text-[var(--color-text-muted)]">
+            No statistics recorded.
+          </div>
+        )}
       </div>
     );
   };
@@ -340,11 +393,11 @@ export default function MatchCenter({
           <tbody>
             {standings.map((row, i) => (
               <tr
-                key={i}
+                key={row.teamId ?? i}
                 className="border-b border-black/5 hover:bg-black/[0.03] transition-colors"
               >
                 <td className="py-3 px-4 text-[var(--color-text-muted)]">
-                  {row.position}
+                  {row.rank ?? i + 1}
                 </td>
                 <td className="py-3 px-4 text-[var(--color-text)] font-medium">
                   {row.team}
@@ -417,9 +470,21 @@ export default function MatchCenter({
             </span>
           )}
 
-          {match.status === 'FT' && (
+          {match.status === 'FINISHED' && (
             <span className="tag-ft inline-block px-3 py-1 text-xs font-bold rounded-full">
               FT
+            </span>
+          )}
+
+          {match.status === 'SCHEDULED' && (
+            <span className="tag-upcoming inline-block px-3 py-1 text-xs font-bold rounded-full">
+              UPCOMING
+            </span>
+          )}
+
+          {(match.status === 'POSTPONED' || match.status === 'CANCELLED') && (
+            <span className="tag-ft inline-block px-3 py-1 text-xs font-bold rounded-full">
+              {match.status}
             </span>
           )}
 
@@ -441,6 +506,18 @@ export default function MatchCenter({
               >
                 {match.homeScore} - {match.awayScore}
               </span>
+              {match.minute != null && (isLive || match.status === 'FINISHED') && (
+                <span
+                  className={`inline-flex items-center gap-1.5 text-sm font-mono font-bold ${
+                    isLive ? 'text-[var(--color-red)]' : 'text-[var(--color-text-muted)]'
+                  }`}
+                >
+                  {isLive && <span className="live-dot w-1.5 h-1.5 rounded-full bg-[var(--color-red)]" />}
+                  {formatMinute(match.minute)}
+                  {match.phase === 'ET' && <span className="px-1 rounded bg-black/5 text-[10px]">ET</span>}
+                  {match.phase === 'PENS' && <span className="px-1 rounded bg-black/5 text-[10px]">PENS</span>}
+                </span>
+              )}
             </div>
 
             <div className="flex flex-col items-center gap-3">
@@ -454,14 +531,14 @@ export default function MatchCenter({
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-[var(--color-text-muted)]">
-            {match.date && <span>{match.date}</span>}
+            {match.date && <span>{dateStr}</span>}
             {kickoff && <span>{kickoff}</span>}
             {match.venue && <span>{match.venue}</span>}
           </div>
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+      <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: "thin" }}>
         {tabs.map((tab) => (
           <button
             key={tab.key}

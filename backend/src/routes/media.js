@@ -1,3 +1,22 @@
+/**
+ * @openapi
+ * /media:
+ *   get:
+ *     tags: [Media]
+ *     summary: List media files with pagination and filters
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *       - in: query
+ *         name: category
+ *         schema: { type: string, enum: [TEAM_LOGO, PLAYER_PHOTO, NEWS_COVER, COMPETITION_LOGO, HOMEPAGE, OTHER] }
+ *     responses:
+ *       200: { description: Paginated list of media files }
+ */
 import { Router } from "express";
 import { body } from "express-validator";
 import path from "node:path";
@@ -10,11 +29,11 @@ import {
   deleteMedia,
   deleteMediaBulk,
   upload,
-  importMulter,
   exportMedia,
   exportMediaTemplate,
   importMedia,
 } from "../controllers/mediaController.js";
+import { importMulter } from "../services/excel/importMulter.js";
 
 const router = Router();
 
@@ -30,7 +49,8 @@ router.post(
   deleteMediaBulk
 );
 
-export default router;
 router.get("/export", requireAuth, requireRole("SUPER_ADMIN", "ADMIN"), exportMedia);
 router.get("/template", requireAuth, requireRole("SUPER_ADMIN", "ADMIN"), exportMediaTemplate);
 router.post("/import", requireAuth, requireRole("SUPER_ADMIN", "ADMIN"), importMulter.single("file"), importMedia);
+
+export default router;

@@ -1,3 +1,47 @@
+/**
+ * @openapi
+ * /news:
+ *   get:
+ *     tags: [News]
+ *     summary: List news articles with pagination and filters
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
+ *         name: category
+ *         schema: { type: string }
+ *       - in: query
+ *         name: status
+ *         schema: { type: string, enum: [PUBLISHED, DRAFT, ARCHIVED] }
+ *       - in: query
+ *         name: featured
+ *         schema: { type: boolean }
+ *     responses:
+ *       200: { description: Paginated list of news articles }
+ */
+
+/**
+ * @openapi
+ * /news/{id}:
+ *   get:
+ *     tags: [News]
+ *     summary: Get a single news article
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: News article }
+ *       404: { description: Article not found }
+ */
 import { Router } from "express";
 import { body } from "express-validator";
 import path from "node:path";
@@ -15,28 +59,20 @@ import {
   exportNewsTemplate,
   importNews,
 } from "../controllers/newsController.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { importMulter } from "../services/excel/importMulter.js";
+import { requireAuth, requireRole, optionalAuth } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
-import multer from "multer";
 
-const importMulter = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(file.mimetype) || ext === ".xlsx" || ext === ".xls") cb(null, true);
-    else cb(new AppError(400, "Only .xlsx and .xls files are allowed"));
-  },
-});
-
-router.get("/", listNews);
-router.get("/slug/:slug", getNewsBySlug);
-router.get("/:id", getNews);
+router.get("/", optionalAuth, listNews);
+router.get("/export", requireAuth, requireRole("SUPER_ADMIN", "ADMIN", "EDITOR"), exportNews);
+router.get("/template", requireAuth, requireRole("SUPER_ADMIN", "ADMIN", "EDITOR"), exportNewsTemplate);
+router.post("/import", requireAuth, requireRole("SUPER_ADMIN", "ADMIN", "EDITOR"), importMulter.single("file"), importNews);
+router.get("/slug/:slug", optionalAuth, getNewsBySlug);
+router.get("/:id", optionalAuth, getNews);
 router.post(
   "/",
   requireAuth,
@@ -80,8 +116,5 @@ router.post(
   deleteNewsBulk
 );
 
-export default router;
 
-router.get("/export", requireAuth, requireRole("SUPER_ADMIN", "ADMIN", "EDITOR"), exportNews);
-router.get("/template", requireAuth, requireRole("SUPER_ADMIN", "ADMIN", "EDITOR"), exportNewsTemplate);
-router.post("/import", requireAuth, requireRole("SUPER_ADMIN", "ADMIN", "EDITOR"), importMulter.single("file"), importNews);
+export default router;

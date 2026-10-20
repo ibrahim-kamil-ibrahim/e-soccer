@@ -296,3 +296,25 @@ a { color: inherit; text-decoration: none; }
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
   .scrollbar-hide::-webkit-scrollbar { display: none; }
 }
+
+/* ===== Admin theme layer =====
+   The admin ships a light palette (white surfaces, dark text). "dark" is the
+   default admin theme and is rendered with the classic invert+hue-rotate
+   technique scoped to the admin root only; "light" adds .es-admin-light which
+   disables the inversion. Media children are counter-inverted so logos and
+   photos keep their natural colors. */
+#es-admin-root:not(.es-admin-light) {
+  filter: invert(1) hue-rotate(180deg);
+}
+#es-admin-root:not(.es-admin-light) img,
+#es-admin-root:not(.es-admin-light) video {
+  filter: invert(1) hue-rotate(180deg);
+}
+#es-admin-root:not(.es-admin-light) input[type="date"],
+#es-admin-root:not(.es-admin-light) input[type="time"],
+#es-admin-root:not(.es-admin-light) input[type="datetime-local"] {
+  color-scheme: dark;
+}
+#es-admin-root.es-admin-light {
+  filter: none;
+}

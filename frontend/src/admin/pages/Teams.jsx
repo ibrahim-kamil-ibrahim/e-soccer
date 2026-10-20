@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, Eye, CheckSquare, Square, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, CheckSquare } from "lucide-react";
 import { teamService } from "../../services/teamService.js";
 import { competitionService } from "../../services/competitionService.js";
 import DataTable, { SearchInput, FilterSelect, FilterBar } from "../components/DataTable.jsx";

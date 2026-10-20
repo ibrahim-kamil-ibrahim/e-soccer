@@ -1,37 +1,34 @@
 import { prisma } from "../config/prisma.js";
 import { AppError, asyncHandler } from "../middleware/errorHandler.js";
-import { logActivity, buildSearchWhere, formatPagination } from "../services/helpers.js";
+import { logActivity, buildSearchWhere, formatPagination, slugify } from "../services/helpers.js";
 import { exportToExcel, generateTemplate } from "../services/excel/excelExport.js";
 import { validateAndImport, parseExcel } from "../services/excel/excelImport.js";
 import { getTemplate } from "../services/excel/excelTemplates.js";
+import { importMulter } from "../services/excel/importMulter.js";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
-import multer from "multer";
-import { slugify } from "../services/helpers.js";
-
-const importMulter = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(file.mimetype) || ext === ".xlsx" || ext === ".xls") cb(null, true);
-    else cb(new AppError(400, "Only .xlsx and .xls files are allowed"));
-  },
-});
 
 export const listNews = asyncHandler(async (req, res) => {
   const { page, limit, skip } = formatPagination(req.query);
   const { search, category, status, author, featured, publishedOnly } = req.query;
+  // Anonymous visitors only ever see published articles; staff keep full visibility.
+  const isStaff = Boolean(req.authId);
+  let statusFilter;
+  if (!isStaff) {
+    statusFilter = "PUBLISHED";
+  } else if (status && status !== "all") {
+    statusFilter = status;
+  } else if (publishedOnly === "true") {
+    statusFilter = "PUBLISHED";
+  }
   const where = {
     ...buildSearchWhere(search, ["title", "summary", "slug"]),
     ...(category && category !== "all" ? { category } : {}),
-    ...(status && status !== "all" ? { status } : {}),
     ...(author && author !== "all" ? { author } : {}),
     ...(featured === "true" ? { featured: true } : {}),
-    ...(publishedOnly === "true" ? { status: "PUBLISHED" } : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
   };
   const [total, items] = await Promise.all([
     prisma.newsArticle.count({ where }),
@@ -44,7 +41,7 @@ export const getNews = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const article = await prisma.newsArticle.findUnique({ where: { id: Number(id) } });
   if (!article) throw new AppError(404, "News article not found");
-  if (req.query.public === "true" && article.status !== "PUBLISHED") throw new AppError(404, "News article not found");
+  if (!req.authId && article.status !== "PUBLISHED") throw new AppError(404, "News article not found");
   res.json({ success: true, article });
 });
 
@@ -52,6 +49,7 @@ export const getNewsBySlug = asyncHandler(async (req, res) => {
   const { slug } = req.params;
   const article = await prisma.newsArticle.findUnique({ where: { slug } });
   if (!article) throw new AppError(404, "News article not found");
+  if (!req.authId && article.status !== "PUBLISHED") throw new AppError(404, "News article not found");
   res.json({ success: true, article });
 });
 
@@ -84,7 +82,7 @@ export const updateNews = asyncHandler(async (req, res) => {
       category: d.category !== undefined ? d.category : existing.category,
       author: d.author !== undefined ? d.author : existing.author,
       coverImage: d.coverImage !== undefined ? d.coverImage : existing.coverImage,
-      publishedAt: d.publishedAt !== undefined ? (d.publishedAt ? (d.status === "PUBLISHED" ? new Date() : new Date(d.publishedAt)) : (d.status === "PUBLISHED" ? new Date() : existing.publishedAt)) : existing.publishedAt,
+      publishedAt: d.publishedAt !== undefined ? (d.publishedAt ? new Date(d.publishedAt) : null) : (d.status === "PUBLISHED" ? (existing.publishedAt || new Date()) : existing.publishedAt),
       status: d.status ?? existing.status, featured: d.featured !== undefined ? Boolean(d.featured) : existing.featured,
     },
   });

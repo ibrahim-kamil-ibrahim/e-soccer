@@ -1,32 +1,14 @@
 import { prisma } from "../config/prisma.js";
 import { AppError, asyncHandler } from "../middleware/errorHandler.js";
-import { logActivity, buildSearchWhere, formatPagination } from "../services/helpers.js";
+import { logActivity, buildSearchWhere, formatPagination, slugify } from "../services/helpers.js";
 import { exportToExcel, generateTemplate } from "../services/excel/excelExport.js";
 import { validateAndImport, parseExcel } from "../services/excel/excelImport.js";
 import { getTemplate } from "../services/excel/excelTemplates.js";
+import { importMulter } from "../services/excel/importMulter.js";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
-import multer from "multer";
-
-const importMulter = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
-      "application/octet-stream",
-    ];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(file.mimetype) || ext === ".xlsx" || ext === ".xls") {
-      cb(null, true);
-    } else {
-      cb(new AppError(400, "Only .xlsx and .xls files are allowed"));
-    }
-  },
-});
 
 export const listTeams = asyncHandler(async (req, res) => {
   const { page, limit, skip } = formatPagination(req.query);
@@ -107,18 +89,21 @@ export const deleteTeams = asyncHandler(async (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) throw new AppError(400, "ids array is required");
   const idsNum = ids.map(Number);
+  // Batch count queries to avoid N+1; count matches in both directions
+  const [playerCounts, homeCounts, awayCounts] = await Promise.all([
+    prisma.player.groupBy({ by: ["teamId"], _count: { _all: true }, where: { teamId: { in: idsNum } } }),
+    prisma.match.groupBy({ by: ["homeTeamId"], _count: { _all: true }, where: { homeTeamId: { in: idsNum } } }),
+    prisma.match.groupBy({ by: ["awayTeamId"], _count: { _all: true }, where: { awayTeamId: { in: idsNum } } }),
+  ]);
+  const playerCountMap = new Map(playerCounts.map((p) => [p.teamId, p._count._all]));
+  const matchCountMap = new Map();
+  for (const m of homeCounts) matchCountMap.set(m.homeTeamId, (matchCountMap.get(m.homeTeamId) || 0) + m._count._all);
+  for (const m of awayCounts) matchCountMap.set(m.awayTeamId, (matchCountMap.get(m.awayTeamId) || 0) + m._count._all);
   const teams = await prisma.team.findMany({ where: { id: { in: idsNum } } });
   const deleted = [];
   const skipped = [];
   for (const t of teams) {
-    const playerCount = await prisma.player.count({ where: { teamId: t.id } });
-    const matchCount = await prisma.match.count({
-      where: { OR: [{ homeTeamId: t.id }, { awayTeamId: t.id }] },
-    });
-    if (playerCount > 0 || matchCount > 0) {
-      skipped.push(t.id);
-      continue;
-    }
+    if ((playerCountMap.get(t.id) || 0) > 0 || (matchCountMap.get(t.id) || 0) > 0) { skipped.push(t.id); continue; }
     await prisma.team.delete({ where: { id: t.id } });
     deleted.push(t.id);
     await logActivity(`Bulk-deleted team #${t.id}`, { entity: "Team", entityId: t.id, userId: req.user.id });
@@ -128,7 +113,7 @@ export const deleteTeams = asyncHandler(async (req, res) => {
 
 function normalizeTeam(d) {
   const name = d.name || "";
-  const slug = d.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const slug = d.slug || slugify(name);
   return {
     name,
     shortName: d.shortName || null,

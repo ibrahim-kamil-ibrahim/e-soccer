@@ -3,6 +3,15 @@ import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "./errorHandler.js";
 
+function parseDurationToMs(duration) {
+  const match = duration.match(/^(\d+)([smhd])$/);
+  if (!match) return 7 * 24 * 60 * 60 * 1000;
+  const value = Number(match[1]);
+  const unit = match[2];
+  const multipliers = { s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
+  return value * (multipliers[unit] || multipliers.d);
+}
+
 export function signToken(user) {
   return jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn,
@@ -14,7 +23,7 @@ export function setAuthCookie(res, token) {
     httpOnly: true,
     secure: env.nodeEnv === "production",
     sameSite: env.nodeEnv === "production" ? "none" : "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: parseDurationToMs(env.jwtExpiresIn),
   });
 }
 
@@ -26,7 +35,7 @@ export function clearAuthCookie(res) {
   });
 }
 
-export function optionalAuth(req, _res, next) {
+export function optionalAuth(req, res, next) {
   const token =
     req.cookies?.token || (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : null);
   if (!token) return next();
@@ -35,7 +44,9 @@ export function optionalAuth(req, _res, next) {
     req.authId = Number(payload.sub);
     req.authRole = payload.role;
   } catch {
-    // ignore invalid token for optional auth
+    clearAuthCookie(res);
+    req.authId = null;
+    req.authRole = null;
   }
   next();
 }

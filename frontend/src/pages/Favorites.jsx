@@ -12,19 +12,23 @@ export default function Favorites({ setSearchOpen, favorites, setFavorites }) {
   const [competitionItems, setCompetitionItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const favTeams = favorites.teams || [];
+  const favPlayers = favorites.players || [];
+  const favCompetitions = favorites.competitions || [];
+
   useEffect(() => {
     const loadFavorites = async () => {
       setLoading(true);
       try {
         const [teams, players, competitions] = await Promise.all([
           Promise.all(
-            (favorites.teams || []).map(id => teamService.get(id).then(res => res.success ? res.team : null).catch(() => null))
+            favTeams.map(id => teamService.get(id).then(res => res.success ? res.team : null).catch(() => null))
           ),
           Promise.all(
-            (favorites.players || []).map(id => playerService.get(id).then(res => res.success ? res.player : null).catch(() => null))
+            favPlayers.map(id => playerService.get(id).then(res => res.success ? res.player : null).catch(() => null))
           ),
           Promise.all(
-            (favorites.competitions || []).map(id => competitionService.get(id).then(res => res.success ? res.competition : null).catch(() => null))
+            favCompetitions.map(id => competitionService.get(id).then(res => res.success ? res.competition : null).catch(() => null))
           ),
         ]);
         setTeamItems(teams.filter(Boolean));
@@ -47,7 +51,7 @@ export default function Favorites({ setSearchOpen, favorites, setFavorites }) {
   };
 
   const hasAnyFavorites =
-    (favorites.teams?.length || 0) + (favorites.players?.length || 0) + (favorites.competitions?.length || 0) > 0;
+    favTeams.length + favPlayers.length + favCompetitions.length > 0;
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -7,7 +7,7 @@ import {
   Inbox,
   Loader2,
 } from "lucide-react";
-import { Field, TextInput, Select } from "./ui.jsx";
+import { TextInput, Select } from "./ui.jsx";
 
 export default function DataTable({
   columns,

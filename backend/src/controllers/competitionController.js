@@ -5,22 +5,11 @@ import { computeStandings } from "../services/standings.js";
 import { exportToExcel, generateTemplate } from "../services/excel/excelExport.js";
 import { validateAndImport, parseExcel } from "../services/excel/excelImport.js";
 import { getTemplate } from "../services/excel/excelTemplates.js";
+import { importMulter } from "../services/excel/importMulter.js";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import crypto from "node:crypto";
-import multer from "multer";
-
-const importMulter = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(file.mimetype) || ext === ".xlsx" || ext === ".xls") cb(null, true);
-    else cb(new AppError(400, "Only .xlsx and .xls files are allowed"));
-  },
-});
 
 export const listCompetitions = asyncHandler(async (req, res) => {
   const { page, limit, skip } = formatPagination(req.query);
@@ -105,13 +94,18 @@ export const deleteCompetitions = asyncHandler(async (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) throw new AppError(400, "ids array is required");
   const idsNum = ids.map(Number);
+  // Batch count queries to avoid N+1
+  const [teamCounts, matchCounts] = await Promise.all([
+    prisma.team.groupBy({ by: ["competitionId"], _count: { _all: true }, where: { competitionId: { in: idsNum } } }),
+    prisma.match.groupBy({ by: ["competitionId"], _count: { _all: true }, where: { competitionId: { in: idsNum } } }),
+  ]);
+  const teamCountMap = new Map(teamCounts.map((t) => [t.competitionId, t._count._all]));
+  const matchCountMap = new Map(matchCounts.map((m) => [m.competitionId, m._count._all]));
   const competitions = await prisma.competition.findMany({ where: { id: { in: idsNum } } });
   const deleted = [];
   const skipped = [];
   for (const c of competitions) {
-    const teamCount = await prisma.team.count({ where: { competitionId: c.id } });
-    const matchCount = await prisma.match.count({ where: { competitionId: c.id } });
-    if (teamCount > 0 || matchCount > 0) { skipped.push(c.id); continue; }
+    if ((teamCountMap.get(c.id) || 0) > 0 || (matchCountMap.get(c.id) || 0) > 0) { skipped.push(c.id); continue; }
     await prisma.competition.delete({ where: { id: c.id } });
     deleted.push(c.id);
     await logActivity(`Bulk-deleted competition #${c.id}`, { entity: "Competition", entityId: c.id, userId: req.user.id });

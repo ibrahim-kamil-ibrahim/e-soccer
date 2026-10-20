@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { authService } from "../../services/authService.js";
-import { setUnauthorizedHandler } from "../../services/api.js";
+import { setUnauthorizedHandler, resetCsrfToken } from "../../services/api.js";
 
 const AuthContext = createContext(null);
 
@@ -21,6 +21,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const res = await authService.login(email, password);
+    resetCsrfToken();
     setUser(res.user);
     return res.user;
   }, []);
@@ -31,6 +32,7 @@ export function AuthProvider({ children }) {
     } catch {
       // ignore
     }
+    resetCsrfToken();
     setUser(null);
   }, []);
 

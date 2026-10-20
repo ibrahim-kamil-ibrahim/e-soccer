@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { matchService } from "../../services/matchService.js";
 import { competitionService } from "../../services/competitionService.js";
 import { teamService } from "../../services/teamService.js";
-import { Field, TextInput, Select, Button, PageHeader, Badge } from "../components/ui.jsx";
+import { Field, TextInput, TextArea, Select, Button, PageHeader, Badge } from "../components/ui.jsx";
 import { useToast } from "../components/Toast.jsx";
 
-const STATUSES = ["UPCOMING", "LIVE", "FT", "POSTPONED", "CANCELLED"];
+const STATUSES = ["SCHEDULED", "LIVE", "FINISHED", "POSTPONED", "CANCELLED"];
 const EVENT_TYPES = ["GOAL", "OWN_GOAL", "PENALTY", "YELLOW_CARD", "RED_CARD", "SUBSTITUTION"];
 const SIDES = ["HOME", "AWAY"];
 const TAB_COLORS = { GOAL: "green", OWN_GOAL: "yellow", PENALTY: "blue", YELLOW_CARD: "yellow", RED_CARD: "red", SUBSTITUTION: "purple" };
@@ -17,21 +17,41 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Local calendar parts of an instant — slicing the ISO string would use UTC
+ *  and could show (and then save) the previous/next day. */
+function localDateStr(iso) {
+  if (!iso) return todayStr();
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return todayStr();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function localTimeStr(iso, fallback = "15:00") {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return fallback;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 const EMPTY_FORM = {
   competitionId: "",
-  season: "2025-26",
+  season: "",
   division: "",
   homeTeamId: "",
   awayTeamId: "",
   homeScore: "",
   awayScore: "",
-  status: "UPCOMING",
+  status: "SCHEDULED",
   minute: "",
   date: todayStr(),
   time: "15:00",
   venue: "",
   referee: "",
   attendance: "",
+  round: "",
+  notes: "",
+  homePenalties: "",
+  awayPenalties: "",
 };
 
 export default function MatchForm() {
@@ -76,19 +96,23 @@ export default function MatchForm() {
         const m = res.match;
         setForm({
           competitionId: m.competitionId || "",
-          season: m.season || "2025-26",
+          season: m.season || "",
           division: m.division || "",
           homeTeamId: m.homeTeamId || "",
           awayTeamId: m.awayTeamId || "",
           homeScore: m.homeScore ?? "",
           awayScore: m.awayScore ?? "",
-          status: m.status || "UPCOMING",
+          status: m.status || "SCHEDULED",
           minute: m.minute ?? "",
-          date: m.date ? m.date.slice(0, 10) : todayStr(),
-          time: m.timeField || "15:00",
+          date: localDateStr(m.date),
+          time: m.timeField || localTimeStr(m.date),
           venue: m.venue || "",
           referee: m.referee || "",
           attendance: m.attendance ?? "",
+          round: m.round || "",
+          notes: m.notes || "",
+          homePenalties: m.homePenalties ?? "",
+          awayPenalties: m.awayPenalties ?? "",
         });
         setEvents(
           (m.events || []).map((e) => ({
@@ -126,6 +150,20 @@ export default function MatchForm() {
 
   const set = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
+  // Season belongs to the competition, so pre-fill it whenever one is chosen
+  // unless the admin has typed their own value.
+  const seasonTouched = useRef(false);
+  const setSeason = (e) => { seasonTouched.current = true; set("season")(e); };
+  const setCompetition = (e) => {
+    const value = e.target.value;
+    const comp = competitions.find((c) => String(c.id) === value);
+    setForm((prev) => ({
+      ...prev,
+      competitionId: value,
+      season: seasonTouched.current ? prev.season : comp?.season || prev.season || "",
+    }));
+  };
+
   const addEvent = () => {
     setEvents((prev) => [...prev, { type: "GOAL", side: "HOME", minute: "", playerName: "", assist: "", playerIn: "", playerOut: "" }]);
   };
@@ -145,6 +183,7 @@ export default function MatchForm() {
     const numOrNull = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
     return {
       ...form,
+      date: new Date(`${form.date}T${form.time || "15:00"}:00`),
       competitionId: form.competitionId ? Number(form.competitionId) : null,
       homeTeamId: Number(form.homeTeamId),
       awayTeamId: Number(form.awayTeamId),
@@ -152,6 +191,10 @@ export default function MatchForm() {
       awayScore: numOrNull(form.awayScore),
       minute: numOrNull(form.minute),
       attendance: numOrNull(form.attendance),
+      round: form.round || null,
+      notes: form.notes || null,
+      homePenalties: numOrNull(form.homePenalties),
+      awayPenalties: numOrNull(form.awayPenalties),
       events: events.map((e) => ({
         type: e.type,
         side: e.side,
@@ -191,6 +234,13 @@ export default function MatchForm() {
       errs.awayTeamId = "Home and away teams must be different";
     }
     if (!form.date) errs.date = "Date is required";
+    else if (isNaN(new Date(`${form.date}T${form.time || "15:00"}:00`).getTime())) errs.date = "Date and time are not a valid kickoff";
+    if (!form.competitionId) errs.competitionId = "Competition is required";
+    if (form.notes && form.notes.length > 300) errs.notes = "Notes must be 300 characters or less";
+    if (form.status === "FINISHED") {
+      if (form.homeScore === "" || form.homeScore === null) errs.homeScore = "Home score is required";
+      if (form.awayScore === "" || form.awayScore === null) errs.awayScore = "Away score is required";
+    }
     setErrors(errs);
     if (Object.keys(errs).length) {
       setTab("basic");
@@ -261,16 +311,16 @@ export default function MatchForm() {
         <div className="bg-white border border-[var(--color-border)] rounded-xl p-5 sm:p-6 max-w-4xl">
           <h3 className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">Basic Information</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <Field label="Competition">
-              <Select value={String(form.competitionId || "")} onChange={set("competitionId")}>
-                <option value="">— None —</option>
+            <Field label="Competition" required error={errors.competitionId}>
+              <Select value={String(form.competitionId || "")} onChange={setCompetition} error={errors.competitionId}>
+                <option value="">— Select competition —</option>
                 {competitions.map((c) => (
                   <option key={c.id} value={String(c.id)}>{c.name}</option>
                 ))}
               </Select>
             </Field>
-            <Field label="Season">
-              <TextInput value={form.season} onChange={set("season")} />
+            <Field label="Season" hint="Defaults from the competition">
+              <TextInput value={form.season} onChange={setSeason} placeholder="e.g. 2025-26" />
             </Field>
             <Field label="Division">
               <TextInput value={form.division} onChange={set("division")} placeholder="e.g. Premier League" />
@@ -297,11 +347,27 @@ export default function MatchForm() {
             <Field label="Attendance">
               <TextInput type="number" value={form.attendance} onChange={set("attendance")} />
             </Field>
+            <Field label="Round / Matchday">
+              <TextInput value={form.round} onChange={set("round")} placeholder='e.g. "Round 5", "Quarter-final"' />
+            </Field>
             {form.status === "LIVE" && (
               <Field label="Current Minute">
                 <TextInput type="number" value={form.minute} onChange={set("minute")} />
               </Field>
             )}
+          </div>
+
+          <div className="mb-6">
+            <Field label="Notes" error={errors.notes} hint={`${form.notes.length}/300`}>
+              <TextArea
+                value={form.notes}
+                onChange={set("notes")}
+                placeholder="Optional notes about this match..."
+                maxLength={300}
+                rows={3}
+                error={errors.notes}
+              />
+            </Field>
           </div>
 
           <h3 className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">Teams</h3>
@@ -326,11 +392,19 @@ export default function MatchForm() {
 
           <h3 className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">Score</h3>
           <div className="grid grid-cols-2 gap-4 mb-6 max-w-xs">
-            <Field label="Home Score">
-              <TextInput type="number" min="0" value={form.homeScore} onChange={set("homeScore")} placeholder="null" />
+            <Field label="Home Score" required={form.status === "FINISHED"} error={errors.homeScore}>
+              <TextInput type="number" min="0" value={form.homeScore} onChange={set("homeScore")} placeholder="null" error={errors.homeScore} />
             </Field>
-            <Field label="Away Score">
-              <TextInput type="number" min="0" value={form.awayScore} onChange={set("awayScore")} placeholder="null" />
+            <Field label="Away Score" required={form.status === "FINISHED"} error={errors.awayScore}>
+              <TextInput type="number" min="0" value={form.awayScore} onChange={set("awayScore")} placeholder="null" error={errors.awayScore} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mb-6 max-w-xs">
+            <Field label="Home Penalties" hint="if drawn">
+              <TextInput type="number" min="0" value={form.homePenalties} onChange={set("homePenalties")} placeholder="—" />
+            </Field>
+            <Field label="Away Penalties" hint="if drawn">
+              <TextInput type="number" min="0" value={form.awayPenalties} onChange={set("awayPenalties")} placeholder="—" />
             </Field>
           </div>
           {form.homeTeamId && form.awayTeamId && form.homeTeamId === form.awayTeamId && (

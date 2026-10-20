@@ -1,3 +1,28 @@
+/**
+ * @openapi
+ * /dashboard/stats:
+ *   get:
+ *     tags: [Dashboard]
+ *     summary: Get admin dashboard statistics
+ *     security: [{ cookieAuth: [] }]
+ *     responses:
+ *       200: { description: Dashboard stats (totalMatches, liveMatches, totalTeams, totalPlayers, totalCompetitions, totalNews) }
+ */
+
+/**
+ * @openapi
+ * /dashboard/matches/recent:
+ *   get:
+ *     tags: [Dashboard]
+ *     summary: Get recent matches for dashboard
+ *     security: [{ cookieAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 5 }
+ *     responses:
+ *       200: { description: Recent matches }
+ */
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
 import { asyncHandler } from "../middleware/errorHandler.js";

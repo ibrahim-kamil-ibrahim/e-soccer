@@ -11,13 +11,16 @@ import { Calendar, TrendingUp, ChevronRight, Clock, Award, MapPin, Users, Goal }
 function StatusBadgeInline({ status }) {
   const config = {
     LIVE: "hero-badge-live",
-    FT: "bg-black/5 text-[var(--color-text-secondary)]",
-    UPCOMING: "bg-black/5 text-[var(--color-text-secondary)]",
+    FINISHED: "bg-black/5 text-[var(--color-text-secondary)]",
+    SCHEDULED: "bg-black/5 text-[var(--color-text-secondary)]",
+    POSTPONED: "bg-[#F59E0B]/10 text-[#B45309]",
+    CANCELLED: "bg-[#EF4444]/10 text-[#DC2626]",
   };
+  const label = status === "SCHEDULED" ? "UPCOMING" : status === "FINISHED" ? "FT" : status;
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${config[status] || config.FT}`}>
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${config[status] || config.FINISHED}`}>
       {status === "LIVE" && <span className="live-dot"></span>}
-      {status === "LIVE" ? "LIVE" : status === "FT" ? "FT" : "UPCOMING"}
+      {label}
     </span>
   );
 }
@@ -136,7 +139,7 @@ export default function Home({ setSearchOpen, favorites, setFavorites }) {
 
                 {/* Score */}
                 <div className="flex flex-col items-center gap-3.5 px-2">
-                  <StatusBadgeInline status={featuredMatch.isFinished ? "FT" : featuredMatch.isLive ? "LIVE" : "UPCOMING"} />
+                  <StatusBadgeInline status={featuredMatch.isFinished ? "FINISHED" : featuredMatch.isLive ? "LIVE" : featuredMatch.status || "SCHEDULED"} />
                   <div className="flex items-center gap-3">
                     <span className="score-num">{featuredMatch.homeScore}</span>
                     <span className="score-num score-num-colon">:</span>
@@ -194,7 +197,7 @@ export default function Home({ setSearchOpen, favorites, setFavorites }) {
             ))}
           </div>
         ) : (
-          <EmptyState />
+          <EmptyState icon="📅" title="No Live Matches" description="No matches are currently live." />
         )}
       </section>
 
@@ -228,7 +231,7 @@ export default function Home({ setSearchOpen, favorites, setFavorites }) {
           </Link>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {recentMatches.filter((m) => m.status === "UPCOMING").map((m) => (
+          {recentMatches.filter((m) => m.status === "SCHEDULED").map((m) => (
             <UpcomingMatchCard key={m.id} match={m} />
           ))}
         </div>

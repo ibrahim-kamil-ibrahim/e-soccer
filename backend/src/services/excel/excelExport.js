@@ -30,20 +30,19 @@ export async function exportToExcel(entity, records, fields) {
     }));
   }
 
-  // Auto-width columns
-  worksheet.columns.forEach((col) => {
-    let maxLength = col.header.length;
-    col.model.eachRow?.((row) => {
-      // simplified: just use header length
-    });
-    col.width = Math.max(maxLength + 2, 12);
+  // Auto-width columns based on header + data content
+  worksheet.columns.forEach((col, idx) => {
+    const headerLen = String(fields[idx]?.header || "").length;
+    let maxLen = headerLen;
+    for (const record of records) {
+      const val = record[fields[idx]?.field];
+      if (val != null) {
+        const len = String(val).length;
+        if (len > maxLen) maxLen = len;
+      }
+    }
+    col.width = Math.max(maxLen + 2, 12);
   });
-
-  // Set column widths based on header length
-  worksheet.columns = worksheet.columns.map((col) => ({
-    ...col,
-    width: Math.max(col.width || 12, col.header?.length + 2 || 12),
-  }));
 
   return await workbook.xlsx.writeBuffer();
 }

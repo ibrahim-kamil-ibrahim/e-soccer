@@ -62,6 +62,7 @@ const baseButton =
 
 export function Button({
   variant = "primary",
+  size = "md",
   loading = false,
   className = "",
   children,
@@ -73,8 +74,13 @@ export function Button({
     ghost: "bg-black/[0.04] hover:bg-black/[0.08] text-[var(--color-text)]",
     outline: "border border-[var(--color-border)] hover:bg-black/[0.04] text-[var(--color-text)]",
   };
+  const sizes = {
+    sm: "px-3 py-1.5 text-xs",
+    md: "px-4 py-2 text-sm",
+    lg: "px-6 py-3 text-base",
+  };
   return (
-    <button className={`${baseButton} ${variants[variant]} ${className}`} disabled={loading} {...props}>
+    <button className={`${baseButton} ${sizes[size]} ${variants[variant]} ${className}`} disabled={loading} {...props}>
       {loading ? <Spinner inline /> : null}
       {children}
     </button>

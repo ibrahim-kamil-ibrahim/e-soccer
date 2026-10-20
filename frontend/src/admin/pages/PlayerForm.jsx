@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, X } from "lucide-react";
+import { ArrowLeft, Upload, X, Check } from "lucide-react";
 import { playerService } from "../../services/playerService.js";
 import { teamService } from "../../services/teamService.js";
 import { cityService } from "../../services/cityService.js";
@@ -16,6 +16,8 @@ const STEPS = [
   { key: "basic", label: "Basic Information", num: 1 },
   { key: "football", label: "Football Info", num: 2 },
   { key: "extra", label: "Additional & Stats", num: 3 },
+  { key: "stats", label: "Statistics", num: 4 },
+  { key: "settings", label: "Settings", num: 5 },
 ];
 
 const EMPTY_FORM = {

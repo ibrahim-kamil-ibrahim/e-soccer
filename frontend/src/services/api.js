@@ -10,9 +10,28 @@ class ApiError extends Error {
 }
 
 let onUnauthorizedHandler = null;
+let csrfToken = null;
 
 export function setUnauthorizedHandler(fn) {
   onUnauthorizedHandler = fn;
+}
+
+export function resetCsrfToken() {
+  csrfToken = null;
+}
+
+export async function getCsrfToken() {
+  if (csrfToken) return csrfToken;
+  try {
+    const data = await fetch(`${API_BASE}/csrf-token`, {
+      method: "GET",
+      credentials: "include",
+    }).then((r) => r.json());
+    csrfToken = data.token || null;
+  } catch {
+    csrfToken = null;
+  }
+  return csrfToken;
 }
 
 export async function request(path, { method = "GET", body, params, headers = {} } = {}) {
@@ -24,6 +43,16 @@ export async function request(path, { method = "GET", body, params, headers = {}
     }
     const qs = sp.toString();
     if (qs) url += `?${qs}`;
+  }
+
+  const safeMethods = ["GET", "HEAD", "OPTIONS"];
+  const isSafe = safeMethods.includes(method.toUpperCase());
+
+  if (!isSafe) {
+    const token = await getCsrfToken();
+    if (token) {
+      headers["x-csrf-token"] = token;
+    }
   }
 
   const options = { method, headers: { ...headers }, credentials: "include" };
@@ -53,6 +82,9 @@ export async function request(path, { method = "GET", body, params, headers = {}
   if (!res.ok) {
     if (res.status === 401 && onUnauthorizedHandler) {
       onUnauthorizedHandler();
+    }
+    if (res.status === 403 && data?.message?.toLowerCase().includes("csrf")) {
+      csrfToken = null;
     }
     throw new ApiError(data?.message || `Request failed (${res.status})`, res.status, data);
   }
